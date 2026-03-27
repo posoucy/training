@@ -110,8 +110,12 @@
   .week-title-dates { font-size: 0.68rem; color: #6060aa; text-align: center; margin-top: 2px; }
   .days-row { display: flex; gap: 5px; flex-wrap: wrap; }
   .day-pill { flex: 1; min-width: 78px; text-align: center; border-radius: 10px; font-size: 0.7rem; font-weight: 600; overflow: hidden; }
-  .day-pill-header { font-weight: 800; font-size: 0.73rem; padding: 6px 3px 3px; }
+  .day-pill-header { font-weight: 800; font-size: 0.73rem; padding: 5px 3px 1px; }
+  .day-pill-date { font-size: 0.9rem; font-weight: 900; padding: 0 3px 1px; line-height: 1; }
   .day-pill-label { padding: 0 3px 6px; font-size: 0.68rem; }
+  .day-pill.today { box-shadow: 0 0 0 2px #f97316; }
+  .day-pill.today .day-pill-header { color: #f97316; }
+  .day-pill.today .day-pill-date { color: #f97316; }
   .day-pill select { width: 100%; background: #0f0f1a; border: none; border-top: 1px solid #2a2a3a; color: #e8e8f0; font-size: 0.68rem; font-weight: 600; padding: 5px 2px; cursor: pointer; outline: none; font-family: inherit; }
   .pill-active { background: #1e1e2e; border: 1px solid #3a3a5a; }
   .pill-rest { background: #13131a; border: 1px dashed #2a2a3a; color: #4a4a6a; }
@@ -445,7 +449,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.31";
+const APP_VERSION = "v2.32";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -904,17 +908,30 @@ function renderWeekSchedule() {
   if(currentProgram && typeof currentProgram.config === "string") { try { currentProgram.config = JSON.parse(currentProgram.config); } catch(e) {} }
   if(!currentProgram?.config?.days) return;
   const dayLabels=["repos",...currentProgram.config.days.map(d=>d.label)];
+
+  // Get actual dates for this week
+  const { start } = getWeekDates(currentWeek);
+  const today = new Date(); today.setHours(0,0,0,0);
+
   row.innerHTML="";
   WEEK_DAYS.forEach((dn,i)=>{
     const val=weekSchedule[i]||"repos", isRest=val==="repos";
-    const pill=document.createElement("div"); pill.className="day-pill "+(isRest?"pill-rest":"pill-active");
+    const dayDate = new Date(start); dayDate.setDate(start.getDate() + i);
+    const isToday = dayDate.getTime() === today.getTime();
+    const dateNum = dayDate.getDate();
+
+    const pill=document.createElement("div");
+    pill.className="day-pill "+(isRest?"pill-rest":"pill-active")+(isToday?" today":"");
     if(!isRest) pill.style.borderColor=getDayCol(val);
+
     const hdr=`<div class="day-pill-header">${dn}</div>`;
+    const dateEl=`<div class="day-pill-date">${dateNum}</div>`;
+
     if(weekEditMode){
       const opts=dayLabels.map(k=>`<option value="${k}" ${val===k?"selected":""}>${k==="repos"?"Repos":k}</option>`).join("");
-      pill.innerHTML=hdr+`<select onchange="updateDay(${i},this.value)">${opts}</select>`;
+      pill.innerHTML=hdr+dateEl+`<select onchange="updateDay(${i},this.value)">${opts}</select>`;
     } else {
-      pill.innerHTML=hdr+`<div class="day-pill-label" ${!isRest?`style="color:${getDayCol(val)}"`:""}>${isRest?"Repos":val}</div>`;
+      pill.innerHTML=hdr+dateEl+`<div class="day-pill-label" ${!isRest?`style="color:${getDayCol(val)}"`:""}>${isRest?"Repos":val}</div>`;
     }
     row.appendChild(pill);
   });
@@ -986,7 +1003,43 @@ async function buildGrid(){
     return;
   }
   grid.innerHTML="";
-  const days=[...currentProgram.config.days].sort((a,b)=>a.id-b.id);
+  // Sort days chronologically: find today's position in the week schedule,
+  // then order training days starting from the next upcoming one
+  const allDays=[...currentProgram.config.days];
+  const today=new Date(); today.setHours(0,0,0,0);
+  const {start:weekStart}=getWeekDates(currentWeek);
+
+  // Find which day-index (0=Mon..6=Sun) is today within this week
+  const todayWeekIdx = (() => {
+    for(let i=0;i<7;i++){
+      const d=new Date(weekStart); d.setDate(weekStart.getDate()+i);
+      if(d.getTime()===today.getTime()) return i;
+    }
+    return -1; // not in this week
+  })();
+
+  // Build ordered list of training labels starting from today onwards (wrap around)
+  const orderedLabels=[];
+  if(todayWeekIdx >= 0){
+    // Go through week starting from today, collect training day labels in order
+    for(let offset=0;offset<7;offset++){
+      const idx=(todayWeekIdx+offset)%7;
+      const label=weekSchedule[idx]||"repos";
+      if(label!=="repos" && !orderedLabels.includes(label)) orderedLabels.push(label);
+    }
+    // Add any remaining labels not in this week's schedule
+    allDays.forEach(d=>{ if(!orderedLabels.includes(d.label)) orderedLabels.push(d.label); });
+  }
+
+  // Sort days array based on orderedLabels, fallback to id order
+  const days = orderedLabels.length > 0
+    ? [...allDays].sort((a,b)=>{
+        const ai=orderedLabels.indexOf(a.label), bi=orderedLabels.indexOf(b.label);
+        if(ai===-1&&bi===-1) return a.id-b.id;
+        if(ai===-1) return 1; if(bi===-1) return -1;
+        return ai-bi;
+      })
+    : [...allDays].sort((a,b)=>a.id-b.id);
   for(const day of days){
     const col=DAY_COLORS[(day.id-1)%DAY_COLORS.length];
     const card=document.createElement("div"); card.className="day-card";
