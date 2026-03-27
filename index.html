@@ -449,7 +449,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.38";
+const APP_VERSION = "v2.39";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -1031,32 +1031,20 @@ async function buildGrid(){
   const isCurrentWeek = now >= wMon && now <= wSun;
 
   // What training label is assigned TODAY in the schedule?
-  const todayLabel = isCurrentWeek ? (weekSchedule[todayIdx] || "repos") : "repos";
+  // Find today's training label
+  const todayLabel = (isCurrentWeek && weekSchedule.length > 0)
+    ? (weekSchedule[todayIdx] || "repos")
+    : "repos";
 
+  // Sort: today's training day first, then all others by id
+  const allSortedById = [...allDays].sort((a, b) => a.id - b.id);
   let days;
-  if (isCurrentWeek && weekSchedule.length > 0) {
-    // Scan forward from TODAY (todayIdx) through the full week
-    // to get training days in chronological order starting from now
-    const ordered = [];
-    for (let offset = 0; offset < 7; offset++) {
-      const idx = (todayIdx + offset) % 7;
-      const label = weekSchedule[idx] || "repos";
-      if (label !== "repos" && !ordered.includes(label)) ordered.push(label);
-    }
-    // Any training day not assigned in this week's schedule → append by id at end
-    [...allDays].sort((a,b)=>a.id-b.id).forEach(d => {
-      if (!ordered.includes(d.label)) ordered.push(d.label);
-    });
-
-    days = [...allDays].sort((a, b) => {
-      const ai = ordered.indexOf(a.label), bi = ordered.indexOf(b.label);
-      if (ai === -1 && bi === -1) return a.id - b.id;
-      if (ai === -1) return 1; if (bi === -1) return -1;
-      return ai - bi;
-    });
+  if (todayLabel !== "repos") {
+    const todayDay = allSortedById.find(d => d.label === todayLabel);
+    const otherDays = allSortedById.filter(d => d.label !== todayLabel);
+    days = todayDay ? [todayDay, ...otherDays] : allSortedById;
   } else {
-    // Past/future week or schedule not loaded → sort by id
-    days = [...allDays].sort((a, b) => a.id - b.id);
+    days = allSortedById;
   }
   for(const day of days){
     const col=DAY_COLORS[(day.id-1)%DAY_COLORS.length];
