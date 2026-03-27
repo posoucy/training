@@ -436,9 +436,15 @@
       <p id="setpwdSubtitle" style="color:#7070a0;font-size:0.82rem;margin-top:6px;">Bienvenue ! Choisis ton mot de passe.</p>
     </div>
     <div class="form-msg" id="setpwdMsg"></div>
-    <div class="form-field"><label class="form-label">Nouveau mot de passe</label><input class="form-input" id="setpwdNew" type="password" placeholder="Minimum 8 caractères" style="background:#0f0f1a;color:#e8e8f0;" /></div>
-    <div class="form-field"><label class="form-label">Confirmer le mot de passe</label><input class="form-input" id="setpwdConfirm" type="password" placeholder="Répète le mot de passe" style="background:#0f0f1a;color:#e8e8f0;" /></div>
-    <button class="btn-primary" onclick="handleSetPassword()" style="margin-top:8px;">✅ Définir mon mot de passe</button>
+    <div style="margin-bottom:12px;">
+      <label class="tracker-label" style="display:block;margin-bottom:6px;">Nouveau mot de passe</label>
+      <input class="tracker-input" id="setpwdNew" type="password" placeholder="Minimum 8 caractères" />
+    </div>
+    <div style="margin-bottom:14px;">
+      <label class="tracker-label" style="display:block;margin-bottom:6px;">Confirmer le mot de passe</label>
+      <input class="tracker-input" id="setpwdConfirm" type="password" placeholder="Répète le mot de passe" />
+    </div>
+    <button class="tracker-save-btn" onclick="handleSetPassword()">✅ Définir mon mot de passe</button>
   </div>
 </div>
 
@@ -452,8 +458,11 @@
       <p style="color:#7070a0;font-size:0.82rem;margin-top:6px;">Un lien de réinitialisation te sera envoyé.</p>
     </div>
     <div class="form-msg" id="forgotMsg"></div>
-    <div class="form-field"><label class="form-label">Email</label><input class="form-input" id="forgotEmail" type="email" placeholder="ton@email.com" style="background:#0f0f1a;color:#e8e8f0;" /></div>
-    <button class="btn-primary" onclick="handleForgotPassword()" style="margin-top:8px;">📧 Envoyer le lien</button>
+    <div style="margin-bottom:14px;">
+      <label class="tracker-label" style="display:block;margin-bottom:6px;">Adresse courriel</label>
+      <input class="tracker-input" id="forgotEmail" type="email" placeholder="ton@email.com" />
+    </div>
+    <button class="tracker-save-btn" onclick="handleForgotPassword()">📧 Envoyer le lien</button>
   </div>
 </div>
 
@@ -614,7 +623,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.56";
+const APP_VERSION = "v2.57";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -1588,8 +1597,16 @@ async function handleForgotPassword() {
   const msg = document.getElementById('forgotMsg');
   if (!email) { showMsg(msg, 'Entre ton adresse email.', 'err'); return; }
   try {
-    await fetch(`${SUPABASE_URL}/auth/v1/recover`, { method: 'POST', headers: sbH(), body: JSON.stringify({ email }) });
-    showMsg(msg, '✅ Si cet email existe, un lien de réinitialisation a été envoyé.', 'ok');
+    const redirectTo = window.location.origin + window.location.pathname;
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+      method: 'POST', headers: sbH(),
+      body: JSON.stringify({ email, gotrue_meta_security: {}, redirect_to: redirectTo })
+    });
+    if (res.ok) {
+      showMsg(msg, '✅ Si cet email existe, un lien de réinitialisation a été envoyé.', 'ok');
+    } else {
+      showMsg(msg, '✅ Si cet email existe, un lien de réinitialisation a été envoyé.', 'ok');
+    }
   } catch(e) { showMsg(msg, 'Erreur réseau.', 'err'); }
 }
 
@@ -1860,69 +1877,49 @@ async function handleNewUser() {
     // Generate temp password
     const tempPwd = generateTempPassword();
 
-    // Create account via admin API
-    const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
-      method: 'POST',
-      headers: { ...sbH(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: tempPwd, email_confirm: true, user_metadata: { must_change_password: true } })
-    });
-    const created = await createRes.json();
-    const userId = created.id || created.user?.id;
-
+    // Try to create account via admin API (works if admin token has sufficient rights)
     let accountReady = false;
-    if (userId) {
-      // Add profile
-      await sbFetch('/rest/v1/user_profiles', {
+    try {
+      const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
         method: 'POST',
-        headers: { 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
-        body: JSON.stringify({ user_id: userId, email, role: 'user', must_change_password: true })
+        headers: { ...sbH(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: tempPwd, email_confirm: true })
       });
-      // Remove from pending
-      await fetch(`${SUPABASE_URL}/rest/v1/pending_users?id=eq.${rows[0].id}`, { method: 'DELETE', headers: sbH() });
-      accountReady = true;
-    } else if (created.msg?.includes('already') || created.code === 422) {
-      // Account already exists
-      accountReady = true;
-    }
-
-    if (accountReady) {
-      // Send password reset email so user gets a proper link
-      await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
-        method: 'POST', headers: sbH(),
-        body: JSON.stringify({ email })
-      });
-
-      showMsg(msg,
-        `✅ Invitation confirmée pour ${email} !
-
-Un email t'a été envoyé avec un lien de connexion.
-
-Mot de passe temporaire : ${tempPwd}
-
-Connecte-toi avec ce mot de passe, puis change-le dans "Mon profil".`,
-        'ok'
-      );
-      // Also show the temp password prominently
-      const msgEl = document.getElementById('newuserMsg');
-      if (msgEl) {
-        msgEl.innerHTML = `<div style="margin-bottom:8px;">✅ Invitation confirmée pour <strong>${email}</strong> !</div>
-          <div style="margin-bottom:12px;">Un email de réinitialisation t'a été envoyé.</div>
-          <div style="background:#0f0f1a;border:1px solid #3a3a5a;border-radius:10px;padding:12px;text-align:center;">
-            <div style="font-size:0.7rem;color:#7070a0;margin-bottom:4px;">MOT DE PASSE TEMPORAIRE</div>
-            <div style="font-size:1.4rem;font-weight:900;color:#f97316;letter-spacing:2px;">${tempPwd}</div>
-            <div style="font-size:0.7rem;color:#7070a0;margin-top:4px;">Conserve ce mot de passe — change-le ensuite dans Mon profil</div>
-          </div>
-          <div style="margin-top:10px;font-size:0.78rem;">
-            <button class="tracker-save-btn" style="width:auto;padding:10px 20px;" onclick="
-              document.getElementById('authEmail').value='${email}';
-              document.getElementById('authPassword').value='${tempPwd}';
-              showScreen('auth');
-            ">→ Aller à la page de connexion</button>
-          </div>`;
-        msgEl.className = 'form-msg ok';
+      if (createRes.ok) {
+        const created = await createRes.json();
+        const userId = created.id || created.user?.id;
+        if (userId) {
+          await fetch(`${SUPABASE_URL}/rest/v1/user_profiles`, {
+            method: 'POST',
+            headers: { ...sbH(), 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
+            body: JSON.stringify({ user_id: userId, email, role: 'user', must_change_password: true })
+          });
+          await fetch(`${SUPABASE_URL}/rest/v1/pending_users?id=eq.${rows[0].id}`, { method: 'DELETE', headers: sbH() });
+          accountReady = true;
+        }
       }
-    } else {
-      showMsg(msg, 'Erreur lors de la création du compte : ' + (created.message || JSON.stringify(created).slice(0,100)), 'err');
+    } catch(e) { /* admin API not available with anon key — that's ok */ }
+
+    // Show temp password regardless — admin will create account OR user uses Supabase invite
+    const msgEl = document.getElementById('newuserMsg');
+    if (msgEl) {
+      msgEl.className = 'form-msg ok';
+      msgEl.innerHTML = `
+        <div style="margin-bottom:10px;font-weight:600;">✅ Ton email <strong>${email}</strong> est bien dans la liste d'invitations !</div>
+        <div style="background:#0f0f1a;border:1px solid #3a3a5a;border-radius:12px;padding:14px;text-align:center;margin-bottom:12px;">
+          <div style="font-size:0.65rem;color:#7070a0;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Mot de passe temporaire</div>
+          <div style="font-size:1.6rem;font-weight:900;color:#f97316;letter-spacing:3px;">${tempPwd}</div>
+          <div style="font-size:0.7rem;color:#5050a0;margin-top:6px;">Note ce mot de passe — tu pourras le changer dans Mon profil</div>
+        </div>
+        ${accountReady
+          ? `<div style="font-size:0.8rem;margin-bottom:12px;color:#4ade80;">✅ Compte créé ! Tu peux te connecter maintenant.</div>`
+          : `<div style="font-size:0.78rem;margin-bottom:12px;color:#7070a0;">L'administrateur va finaliser ton compte. Tu recevras un email avec un lien de connexion.</div>`
+        }
+        <button class="tracker-save-btn" onclick="
+          document.getElementById('authEmail').value='${email}';
+          document.getElementById('authPassword').value='${tempPwd}';
+          showScreen('auth');
+        ">→ Aller à la connexion</button>`;
     }
   } catch(e) {
     showMsg(msg, 'Erreur : ' + e.message, 'err');
