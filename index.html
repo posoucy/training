@@ -419,6 +419,84 @@
   </div>
 </div>
 
+<!-- ── Set Password Screen ── -->
+<div id="screen-setpassword" class="screen" style="display:none;align-items:center;justify-content:center;">
+  <div class="setpwd-box">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:2rem">🔐</div>
+      <h2 style="font-size:1.2rem;font-weight:900;margin-top:8px;background:linear-gradient(135deg,#f97316,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Définir ton mot de passe</h2>
+      <p id="setpwdSubtitle" style="color:#7070a0;font-size:0.82rem;margin-top:6px;">Bienvenue ! Choisis ton mot de passe.</p>
+    </div>
+    <div class="form-msg" id="setpwdMsg"></div>
+    <div class="form-field"><label class="form-label">Nouveau mot de passe</label><input class="form-input" id="setpwdNew" type="password" placeholder="Minimum 8 caractères" /></div>
+    <div class="form-field"><label class="form-label">Confirmer le mot de passe</label><input class="form-input" id="setpwdConfirm" type="password" placeholder="Répète le mot de passe" /></div>
+    <button class="btn-primary" onclick="handleSetPassword()" style="margin-top:8px;">✅ Définir mon mot de passe</button>
+  </div>
+</div>
+
+<!-- ── Forgot Password Screen ── -->
+<div id="screen-forgot" class="screen" style="display:none;align-items:center;justify-content:center;">
+  <div class="setpwd-box">
+    <button class="screen-back" onclick="showScreen('auth')">← Retour à la connexion</button>
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:2rem">📧</div>
+      <h2 style="font-size:1.2rem;font-weight:900;margin-top:8px;background:linear-gradient(135deg,#f97316,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Mot de passe oublié</h2>
+      <p style="color:#7070a0;font-size:0.82rem;margin-top:6px;">Un lien de réinitialisation te sera envoyé.</p>
+    </div>
+    <div class="form-msg" id="forgotMsg"></div>
+    <div class="form-field"><label class="form-label">Email</label><input class="form-input" id="forgotEmail" type="email" placeholder="ton@email.com" /></div>
+    <button class="btn-primary" onclick="handleForgotPassword()" style="margin-top:8px;">📧 Envoyer le lien</button>
+  </div>
+</div>
+
+<!-- ── Admin Screen ── -->
+<div id="screen-admin" class="screen">
+  <button class="screen-back" onclick="goToPrograms()">← Retour</button>
+  <div class="screen-title">🛡️ Administration</div>
+  <div class="screen-subtitle">Gestion des utilisateurs du Gym Tracker</div>
+  <div class="section-card">
+    <h3>➕ Ajouter un utilisateur</h3>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+      <div class="form-field" style="flex:2;margin:0;"><label class="form-label">Adresse courriel</label><input class="form-input" id="adminNewEmail" type="email" placeholder="nouvel@utilisateur.com" /></div>
+      <div style="padding-bottom:0;"><button class="btn-form-primary" onclick="adminAddUser()">➕ Ajouter</button></div>
+    </div>
+    <div class="form-msg" id="adminAddMsg" style="margin-top:10px;"></div>
+    <p style="font-size:0.73rem;color:#6060a0;margin-top:10px;">L'utilisateur devra entrer son email + choisir un mot de passe lors de sa première connexion.</p>
+  </div>
+  <div class="section-card">
+    <h3>👥 Utilisateurs actifs</h3>
+    <div class="user-list" id="adminUserList"><div style="color:#6060a0;font-size:0.82rem;">Chargement…</div></div>
+  </div>
+  <div class="section-card">
+    <h3>⏳ Invitations en attente</h3>
+    <div class="user-list" id="adminPendingList"><div style="color:#6060a0;font-size:0.82rem;">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- ── Profile Screen ── -->
+<div id="screen-profile" class="screen">
+  <button class="screen-back" onclick="goToPrograms()">← Retour</button>
+  <div class="screen-title">👤 Mon profil</div>
+  <div class="screen-subtitle" id="profileEmail" style="color:#7070a0;font-size:0.82rem;margin-bottom:20px;"></div>
+  <div class="section-card">
+    <h3>📝 Informations personnelles</h3>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div class="form-field" style="flex:1;min-width:130px;"><label class="form-label">Prénom</label><input class="form-input" id="profileFirstName" type="text" placeholder="Prénom" /></div>
+      <div class="form-field" style="flex:1;min-width:130px;"><label class="form-label">Nom</label><input class="form-input" id="profileLastName" type="text" placeholder="Nom de famille" /></div>
+    </div>
+    <div class="form-field" style="max-width:140px;"><label class="form-label">Âge</label><input class="form-input" id="profileAge" type="number" placeholder="Ex: 32" min="14" max="99" /></div>
+    <button class="btn-form-primary" onclick="saveProfile()">💾 Sauvegarder</button>
+    <div class="form-msg" id="profileMsg" style="margin-top:10px;"></div>
+  </div>
+  <div class="section-card">
+    <h3>🔐 Changer le mot de passe</h3>
+    <div class="form-field"><label class="form-label">Nouveau mot de passe</label><input class="form-input" id="profilePwdNew" type="password" placeholder="Minimum 8 caractères" /></div>
+    <div class="form-field"><label class="form-label">Confirmer</label><input class="form-input" id="profilePwdConfirm" type="password" placeholder="Répète le mot de passe" /></div>
+    <button class="btn-form-primary" onclick="changePassword()">🔐 Modifier le mot de passe</button>
+    <div class="form-msg" id="profilePwdMsg" style="margin-top:10px;"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="modal-header">
@@ -449,7 +527,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.40";
+const APP_VERSION = "v2.41";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -502,10 +580,18 @@ let currentSession = null, currentProgram = null, currentWeek = 1, weekSchedule 
 
 function sbH(token) { return { "Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+(token||SUPABASE_KEY) }; }
 
+const FLEX_SCREENS = ["auth","setpassword","forgot"];
 function showScreen(name) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".screen").forEach(s => {
+    s.classList.remove("active");
+    s.style.display = "none";
+  });
   const el = document.getElementById("screen-"+name);
-  if (el) { el.classList.add("active"); window.scrollTo(0,0); }
+  if (el) {
+    el.style.display = FLEX_SCREENS.includes(name) ? "flex" : "block";
+    el.classList.add("active");
+    window.scrollTo(0,0);
+  }
   const tb = document.getElementById("topBar");
   if (tb) tb.style.display = (name==="workout") ? "flex" : "none";
 }
@@ -528,14 +614,49 @@ async function handleSignIn() {
   const err=document.getElementById("authError");
   if(!emailEl||!passEl||!err) return;
   err.style.display="none";
-  const email=emailEl.value.trim(), password=passEl.value;
+  const email=emailEl.value.trim().toLowerCase(), password=passEl.value;
   if(!email||!password){err.textContent="Remplis les deux champs.";err.style.display="block";return;}
   const btn=document.querySelector("#screen-auth .btn-primary");
   if(btn){btn.textContent="Connexion…";btn.disabled=true;}
   try {
     const d=await signIn(email,password);
-    if(d.access_token){await enterApp();}
-    else{err.textContent=d.error_description||d.msg||"Identifiants incorrects.";err.style.display="block";}
+    if(d.access_token){
+      await enterApp();
+    } else {
+      // Check if email is in pending_users → allow signup
+      const pRes = await fetch(`${SUPABASE_URL}/rest/v1/pending_users?email=eq.${encodeURIComponent(email)}&select=id`, { headers: sbH() });
+      if (pRes.ok) {
+        const rows = await pRes.json();
+        if (rows.length > 0) {
+          // Pending user — try to create account
+          if (!password || password.length < 8) {
+            err.textContent = "Bienvenue ! Ton email est autorisé. Choisis un mot de passe d'au moins 8 caractères.";
+            err.style.display = "block";
+          } else {
+            const signupRes = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+              method: 'POST', headers: sbH(),
+              body: JSON.stringify({ email, password })
+            });
+            const sd = await signupRes.json();
+            if (sd.access_token || sd.user?.id) {
+              // Remove from pending
+              await fetch(`${SUPABASE_URL}/rest/v1/pending_users?id=eq.${rows[0].id}`, { method: 'DELETE', headers: sbH() });
+              // Sign in
+              const d2 = await signIn(email, password);
+              if (d2.access_token) { await enterApp(); return; }
+            }
+            err.textContent = sd.message || sd.error_description || "Erreur création de compte.";
+            err.style.display = "block";
+          }
+        } else {
+          err.textContent = d.error_description || d.msg || "Identifiants incorrects ou accès non autorisé.";
+          err.style.display = "block";
+        }
+      } else {
+        err.textContent = d.error_description || d.msg || "Identifiants incorrects.";
+        err.style.display = "block";
+      }
+    }
   } catch(e) {
     err.textContent="Erreur réseau. Vérifie ta connexion.";err.style.display="block";
   } finally {
@@ -583,14 +704,29 @@ async function deleteProgram(id) { await sbFetch(`/rest/v1/programs?id=eq.${id}`
 
 async function enterApp() {
   document.getElementById("programsUserEmail").textContent=currentSession?.user?.email||"";
-  // Load API key from Supabase (sync across devices)
   await loadApiKeyRemote();
+  await loadUserProfile();
+  await ensureProfile();
+
+  // Show admin button if user is admin
+  const adminBtn = document.getElementById('adminBtn');
+  if (adminBtn) adminBtn.style.display = isAdmin() ? 'inline-block' : 'none';
+
+  // If user must change password, redirect
+  if (currentUserProfile?.must_change_password) {
+    document.getElementById('setpwdSubtitle').textContent = 'Bienvenue ! Choisis ton mot de passe pour accéder à l'app.';
+    showScreen('setpassword');
+    return;
+  }
+
   const progs=await loadPrograms();
   renderProgramsScreen(progs);
   showScreen("programs");
 }
 
 async function goToPrograms() {
+  const adminBtn = document.getElementById('adminBtn');
+  if (adminBtn) adminBtn.style.display = isAdmin() ? 'inline-block' : 'none';
   const progs=await loadPrograms();
   renderProgramsScreen(progs);
   showScreen("programs");
@@ -1288,17 +1424,237 @@ document.getElementById("editProgOverlay")?.addEventListener("click", function(e
   if (e.target === this) closeEditProg();
 });
 
+// ── User Profile ─────────────────────────────────────────────
+let currentUserProfile = null;
+
+async function loadUserProfile() {
+  if (!currentSession?.access_token) return;
+  try {
+    const res = await sbFetch(`/rest/v1/user_profiles?user_id=eq.${currentSession.user.id}&select=*`);
+    if (res.ok) { const rows = await res.json(); currentUserProfile = rows.length > 0 ? rows[0] : null; }
+  } catch(e) {}
+}
+
+function isAdmin() { return currentUserProfile?.role === 'admin'; }
+
+async function ensureProfile() {
+  if (!currentUserProfile) {
+    try {
+      await sbFetch('/rest/v1/user_profiles', {
+        method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates' },
+        body: JSON.stringify({ user_id: currentSession.user.id, email: currentSession.user.email, role: 'user' })
+      });
+      await loadUserProfile();
+    } catch(e) {}
+  }
+}
+
+// ── Set Password ──────────────────────────────────────────────
+let setPasswordToken = null;
+
+async function handleSetPassword() {
+  const pwd = document.getElementById('setpwdNew')?.value;
+  const confirm = document.getElementById('setpwdConfirm')?.value;
+  const msg = document.getElementById('setpwdMsg');
+  if (!pwd || pwd.length < 8) { showMsg(msg, 'Minimum 8 caractères.', 'err'); return; }
+  if (pwd !== confirm) { showMsg(msg, 'Les mots de passe ne correspondent pas.', 'err'); return; }
+  try {
+    const token = setPasswordToken || currentSession?.access_token;
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: 'PUT', headers: { ...sbH(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pwd })
+    });
+    if (res.ok) {
+      if (currentSession?.user?.id) {
+        await sbFetch('/rest/v1/user_profiles', {
+          method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates' },
+          body: JSON.stringify({ user_id: currentSession.user.id, email: currentSession.user.email, must_change_password: false })
+        });
+      }
+      showMsg(msg, '✅ Mot de passe défini ! Redirection…', 'ok');
+      setTimeout(async () => { await loadUserProfile(); await enterApp(); }, 1500);
+    } else { const e = await res.json(); showMsg(msg, e.message || 'Erreur.', 'err'); }
+  } catch(e) { showMsg(msg, 'Erreur réseau : ' + e.message, 'err'); }
+}
+
+// ── Forgot Password ───────────────────────────────────────────
+async function handleForgotPassword() {
+  const email = document.getElementById('forgotEmail')?.value.trim();
+  const msg = document.getElementById('forgotMsg');
+  if (!email) { showMsg(msg, 'Entre ton adresse email.', 'err'); return; }
+  try {
+    await fetch(`${SUPABASE_URL}/auth/v1/recover`, { method: 'POST', headers: sbH(), body: JSON.stringify({ email }) });
+    showMsg(msg, '✅ Si cet email existe, un lien de réinitialisation a été envoyé.', 'ok');
+  } catch(e) { showMsg(msg, 'Erreur réseau.', 'err'); }
+}
+
+function checkRecoveryToken() {
+  const hash = window.location.hash;
+  if (!hash) return false;
+  const params = new URLSearchParams(hash.replace('#', '?'));
+  const type = params.get('type'), token = params.get('access_token');
+  if ((type === 'recovery' || type === 'signup') && token) {
+    setPasswordToken = token;
+    currentSession = { access_token: token, user: { id: '', email: '' } };
+    fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: sbH(token) })
+      .then(r => r.json()).then(u => { if (u.id) currentSession.user = u; }).catch(() => {});
+    document.getElementById('setpwdSubtitle').textContent = 'Entre ton nouveau mot de passe.';
+    history.replaceState(null, '', window.location.pathname);
+    showScreen('setpassword');
+    return true;
+  }
+  return false;
+}
+
+// ── Profile Screen ────────────────────────────────────────────
+async function showProfileScreen() {
+  await loadUserProfile();
+  const p = currentUserProfile || {};
+  document.getElementById('profileEmail').textContent = currentSession?.user?.email || '';
+  document.getElementById('profileFirstName').value = p.first_name || '';
+  document.getElementById('profileLastName').value = p.last_name || '';
+  document.getElementById('profileAge').value = p.age || '';
+  document.getElementById('profilePwdNew').value = '';
+  document.getElementById('profilePwdConfirm').value = '';
+  hideMsg('profileMsg'); hideMsg('profilePwdMsg');
+  showScreen('profile');
+}
+
+async function saveProfile() {
+  const first_name = document.getElementById('profileFirstName').value.trim();
+  const last_name = document.getElementById('profileLastName').value.trim();
+  const age = parseInt(document.getElementById('profileAge').value) || null;
+  const msg = document.getElementById('profileMsg');
+  try {
+    const res = await sbFetch('/rest/v1/user_profiles', {
+      method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({ user_id: currentSession.user.id, email: currentSession.user.email, first_name, last_name, age })
+    });
+    if (res.ok) { showMsg(msg, '✅ Profil sauvegardé !', 'ok'); await loadUserProfile(); }
+    else showMsg(msg, 'Erreur lors de la sauvegarde.', 'err');
+  } catch(e) { showMsg(msg, 'Erreur : ' + e.message, 'err'); }
+}
+
+async function changePassword() {
+  const pwd = document.getElementById('profilePwdNew').value;
+  const confirm = document.getElementById('profilePwdConfirm').value;
+  const msg = document.getElementById('profilePwdMsg');
+  if (!pwd || pwd.length < 8) { showMsg(msg, 'Minimum 8 caractères.', 'err'); return; }
+  if (pwd !== confirm) { showMsg(msg, 'Les mots de passe ne correspondent pas.', 'err'); return; }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: 'PUT', headers: { ...sbH(currentSession.access_token) },
+      body: JSON.stringify({ password: pwd })
+    });
+    if (res.ok) { showMsg(msg, '✅ Mot de passe modifié !', 'ok'); document.getElementById('profilePwdNew').value = ''; document.getElementById('profilePwdConfirm').value = ''; }
+    else { const e = await res.json(); showMsg(msg, e.message || 'Erreur.', 'err'); }
+  } catch(e) { showMsg(msg, 'Erreur : ' + e.message, 'err'); }
+}
+
+// ── Admin Screen ──────────────────────────────────────────────
+async function showAdminScreen() { showScreen('admin'); await loadAdminData(); }
+
+async function loadAdminData() { await loadActiveUsers(); await loadPendingUsers(); }
+
+async function loadActiveUsers() {
+  const list = document.getElementById('adminUserList');
+  if (!list) return;
+  try {
+    const res = await sbFetch('/rest/v1/user_profiles?select=*&order=created_at.asc');
+    if (!res.ok) { list.innerHTML = '<div style="color:#f87171;font-size:0.8rem;">Erreur.</div>'; return; }
+    const users = await res.json();
+    if (!users.length) { list.innerHTML = '<div style="color:#6060a0;font-size:0.82rem;">Aucun utilisateur.</div>'; return; }
+    list.innerHTML = users.map(u => `
+      <div class="user-row">
+        <div class="user-row-info">
+          <div class="user-row-email">${u.email || '—'}</div>
+          <div class="user-row-meta">${[u.first_name, u.last_name].filter(Boolean).join(' ')}${u.age ? ' · ' + u.age + ' ans' : ''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="role-badge ${u.role==='admin'?'role-admin':'role-user'}">${u.role==='admin'?'🛡️ Admin':'👤 User'}</span>
+          ${u.user_id !== currentSession?.user?.id ? `<button class="btn-form-danger" onclick="adminRemoveUser('${u.user_id}','${(u.email||'').replace(/'/g,"\'")}')">✕</button>` : ''}
+        </div>
+      </div>`).join('');
+  } catch(e) { list.innerHTML = '<div style="color:#f87171;">Erreur : ' + e.message + '</div>'; }
+}
+
+async function loadPendingUsers() {
+  const list = document.getElementById('adminPendingList');
+  if (!list) return;
+  try {
+    const res = await sbFetch('/rest/v1/pending_users?select=*&order=created_at.asc');
+    if (!res.ok) { list.innerHTML = '<div style="color:#f87171;">Erreur.</div>'; return; }
+    const pending = await res.json();
+    if (!pending.length) { list.innerHTML = '<div style="color:#6060a0;font-size:0.82rem;">Aucune invitation en attente.</div>'; return; }
+    list.innerHTML = pending.map(p => `
+      <div class="user-row">
+        <div class="user-row-info">
+          <div class="user-row-email">${p.email}</div>
+          <div class="user-row-meta">Ajouté le ${new Date(p.created_at).toLocaleDateString('fr-CA')}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="pending-badge">⏳ En attente</span>
+          <button class="btn-form-danger" onclick="adminRemovePending('${p.id}','${p.email.replace(/'/g,"\'")}')">✕</button>
+        </div>
+      </div>`).join('');
+  } catch(e) { list.innerHTML = '<div style="color:#f87171;">Erreur.</div>'; }
+}
+
+async function adminAddUser() {
+  const email = document.getElementById('adminNewEmail')?.value.trim().toLowerCase();
+  const msg = document.getElementById('adminAddMsg');
+  if (!email || !email.includes('@')) { showMsg(msg, 'Entre une adresse email valide.', 'err'); return; }
+  try {
+    const res = await sbFetch('/rest/v1/pending_users', {
+      method: 'POST', headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify({ email, created_by: currentSession.user.id })
+    });
+    if (res.ok || res.status === 201) {
+      showMsg(msg, `✅ ${email} ajouté ! Il pourra créer son compte lors de sa première connexion.`, 'ok');
+      document.getElementById('adminNewEmail').value = '';
+      await loadPendingUsers();
+    } else {
+      const err = await res.json();
+      showMsg(msg, err.message?.includes('unique') ? 'Cet email est déjà dans la liste.' : (err.message || 'Erreur.'), 'err');
+    }
+  } catch(e) { showMsg(msg, 'Erreur : ' + e.message, 'err'); }
+}
+
+async function adminRemoveUser(userId, email) {
+  if (!confirm(`Supprimer l'utilisateur ${email} ?`)) return;
+  await sbFetch(`/rest/v1/user_profiles?user_id=eq.${userId}`, { method: 'DELETE' });
+  await loadActiveUsers();
+}
+
+async function adminRemovePending(id, email) {
+  if (!confirm(`Retirer l'invitation de ${email} ?`)) return;
+  await sbFetch(`/rest/v1/pending_users?id=eq.${id}`, { method: 'DELETE' });
+  await loadPendingUsers();
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function showMsg(el, text, type) {
+  if (!el) return;
+  el.textContent = text; el.className = 'form-msg ' + type;
+}
+function hideMsg(id) {
+  const el = document.getElementById(id);
+  if (el) { el.className = 'form-msg'; el.textContent = ''; }
+}
+
 // ── Init ──────────────────────────────────────────────────────
 (async()=>{
-  // Display version
   const vEl = document.getElementById("authVersion");
   if (vEl) vEl.textContent = APP_VERSION;
+
+  // Check for password recovery / signup token in URL hash
+  if (checkRecoveryToken()) return;
+
   try {
     const ok = await restoreSession();
     if (ok) { await enterApp(); }
     else { showScreen("auth"); }
   } catch(e) {
-    // Clear any corrupt session and show auth
     try { localStorage.removeItem("sb_session"); } catch(e2) {}
     currentSession = null;
     showScreen("auth");
