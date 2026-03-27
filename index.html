@@ -478,7 +478,7 @@
           <div class="form-msg" id="adminAddMsg" style="margin-top:8px;"></div>
         </div>
         <div style="font-size:0.72rem;color:#5050a0;line-height:1.5;">
-          💡 L'utilisateur entre son email + choisit un mot de passe lors de sa première connexion.
+          💡 Le compte est créé automatiquement. L'utilisateur se connecte avec son email, puis définit son mot de passe dans <strong style="color:#7070a0">Mon profil</strong>. Si ça ne fonctionne pas, utilise <strong style="color:#7070a0">Supabase → Authentication → Users → Invite user</strong>.
         </div>
       </div>
     </div>
@@ -562,6 +562,24 @@
   </div>
 </div>
 
+<!-- ── New User Screen ── -->
+<div id="screen-newuser" class="screen" style="display:none;align-items:center;justify-content:center;">
+  <div class="setpwd-box">
+    <button class="btn-small" onclick="showScreen('auth')" style="margin-bottom:16px;">← Retour</button>
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:2rem">👋</div>
+      <h2 style="font-size:1.2rem;font-weight:900;margin-top:8px;background:linear-gradient(135deg,#f97316,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Première connexion</h2>
+      <p style="color:#7070a0;font-size:0.82rem;margin-top:6px;">Entre ton adresse courriel pour vérifier si tu as été invité.</p>
+    </div>
+    <div class="form-msg" id="newuserMsg"></div>
+    <div style="margin-bottom:14px;">
+      <label class="tracker-label" style="display:block;margin-bottom:6px;">Adresse courriel</label>
+      <input class="tracker-input" id="newuserEmail" type="email" placeholder="ton@email.com" />
+    </div>
+    <button class="tracker-save-btn" onclick="handleNewUser()">Vérifier mon invitation</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="modal-header">
@@ -592,7 +610,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.54-debug";
+const APP_VERSION = "v2.55";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -645,7 +663,7 @@ let currentSession = null, currentProgram = null, currentWeek = 1, weekSchedule 
 
 function sbH(token) { return { "Content-Type":"application/json","apikey":SUPABASE_KEY,"Authorization":"Bearer "+(token||SUPABASE_KEY) }; }
 
-const FLEX_SCREENS = ["auth","setpassword","forgot"];
+const FLEX_SCREENS = ["auth","setpassword","forgot","newuser"];
 function showScreen(name) {
   document.querySelectorAll(".screen").forEach(s => {
     s.classList.remove("active");
@@ -698,39 +716,11 @@ async function handleSignIn() {
             err.textContent = "Bienvenue ! Ton email est autorisé. Choisis un mot de passe d'au moins 8 caractères.";
             err.style.display = "block";
           } else {
-            // Create account
-            const signupRes = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-              method: 'POST', headers: sbH(),
-              body: JSON.stringify({ email, password })
-            });
-            const sd = await signupRes.json();
-
-            // Success: access_token OR user with id (email confirmation disabled)
-            // Also handle "User already registered" — means account exists, just try sign in
-            if (sd.access_token) {
-              await fetch(`${SUPABASE_URL}/rest/v1/pending_users?id=eq.${rows[0].id}`, { method: 'DELETE', headers: sbH() });
-              currentSession = sd; localStorage.setItem("sb_session", JSON.stringify(sd));
-              await enterApp(); return;
-            } else if (sd.user?.id || sd.id) {
-              // User created but needs email confirmation OR auto-confirmed
-              await fetch(`${SUPABASE_URL}/rest/v1/pending_users?id=eq.${rows[0].id}`, { method: 'DELETE', headers: sbH() });
-              // Try immediate sign in
-              const d2 = await signIn(email, password);
-              if (d2.access_token) { await enterApp(); return; }
-              // Email confirmation required
-              err.textContent = "✅ Compte créé ! Vérifie ton email pour confirmer ton compte, puis connecte-toi.";
-              err.style.color = "#4ade80"; err.style.display = "block";
-            } else if (sd.msg?.includes("already registered") || sd.error?.includes("already registered")) {
-              // Already exists — just sign in
-              const d2 = await signIn(email, password);
-              if (d2.access_token) { await enterApp(); return; }
-              err.textContent = "Ce compte existe déjà. Utilise le bon mot de passe.";
-              err.style.display = "block";
-            } else {
-              // Show exact raw response for diagnosis
-              err.textContent = "Réponse Supabase : " + JSON.stringify(sd).slice(0, 300);
-              err.style.display = "block";
-            }
+            // signups disabled — user must be created by admin
+            // Show friendly message explaining the flow
+            err.style.color = "#fbbf24";
+            err.textContent = "⚠️ Ton email est autorisé mais le compte doit être créé par l'administrateur. Contacte l'admin pour finaliser ton accès.";
+            err.style.display = "block";
           }
         } else {
           err.textContent = d.error_description || d.msg || "Identifiants incorrects ou accès non autorisé.";
@@ -1760,18 +1750,56 @@ async function adminAddUser() {
   const email = document.getElementById('adminNewEmail')?.value.trim().toLowerCase();
   const msg = document.getElementById('adminAddMsg');
   if (!email || !email.includes('@')) { showMsg(msg, 'Entre une adresse email valide.', 'err'); return; }
+
+  // Step 1: Add to pending list
   try {
-    const res = await sbFetch('/rest/v1/pending_users', {
+    const pendingRes = await sbFetch('/rest/v1/pending_users', {
       method: 'POST', headers: { 'Prefer': 'return=representation' },
       body: JSON.stringify({ email, created_by: currentSession.user.id })
     });
-    if (res.ok || res.status === 201) {
-      showMsg(msg, `✅ ${email} ajouté ! Il pourra créer son compte lors de sa première connexion.`, 'ok');
+    const alreadyPending = pendingRes.status === 409 || pendingRes.status === 422;
+
+    // Step 2: Create user via Supabase Admin API using anon key + admin token
+    const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: { ...sbH(currentSession.access_token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        email_confirm: true,
+        user_metadata: { invited: true }
+      })
+    });
+    const created = await createRes.json();
+
+    if (created.id || created.user?.id) {
+      const userId = created.id || created.user?.id;
+      // Add to user_profiles
+      await sbFetch('/rest/v1/user_profiles', {
+        method: 'POST',
+        headers: { 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
+        body: JSON.stringify({ user_id: userId, email, role: 'user', must_change_password: true })
+      });
+      // Remove from pending if was there
+      if (!alreadyPending) {
+        const rows = pendingRes.ok ? await pendingRes.json() : [];
+        if (rows[0]?.id) await sbFetch(`/rest/v1/pending_users?id=eq.${rows[0].id}`, { method: 'DELETE' });
+      }
+      showMsg(msg, `✅ Compte créé pour ${email} ! L'utilisateur peut maintenant se connecter et choisir son mot de passe depuis son profil.`, 'ok');
+      document.getElementById('adminNewEmail').value = '';
+      await loadAdminData();
+    } else if (created.msg?.includes('already') || created.error?.includes('already')) {
+      showMsg(msg, `ℹ️ ${email} a déjà un compte Supabase. Il peut se connecter directement.`, 'ok');
+      await loadAdminData();
+    } else {
+      // Admin API not available (anon key can't create users) — keep in pending
+      if (pendingRes.ok || alreadyPending) {
+        showMsg(msg, `✅ ${email} ajouté à la liste d'attente. Va dans Supabase → Authentication → Users → "Invite user" pour finaliser.`, 'ok');
+      } else {
+        const e = await pendingRes.json().catch(() => ({}));
+        showMsg(msg, e.message?.includes('unique') ? 'Cet email est déjà dans la liste.' : 'Erreur : ' + (e.message || ''), 'err');
+      }
       document.getElementById('adminNewEmail').value = '';
       await loadPendingUsers();
-    } else {
-      const err = await res.json();
-      showMsg(msg, err.message?.includes('unique') ? 'Cet email est déjà dans la liste.' : (err.message || 'Erreur.'), 'err');
     }
   } catch(e) { showMsg(msg, 'Erreur : ' + e.message, 'err'); }
 }
@@ -1796,6 +1824,107 @@ function showMsg(el, text, type) {
 function hideMsg(id) {
   const el = document.getElementById(id);
   if (el) { el.className = 'form-msg'; el.textContent = ''; }
+}
+
+// ── New User Flow ─────────────────────────────────────────────
+function generateTempPassword() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let pwd = '';
+  for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
+  return pwd;
+}
+
+async function handleNewUser() {
+  const email = document.getElementById('newuserEmail')?.value.trim().toLowerCase();
+  const msg = document.getElementById('newuserMsg');
+  if (!email || !email.includes('@')) { showMsg(msg, 'Entre une adresse email valide.', 'err'); return; }
+
+  const btn = document.querySelector('#screen-newuser .tracker-save-btn');
+  if (btn) { btn.textContent = 'Vérification…'; btn.disabled = true; }
+
+  try {
+    // Check if email is in pending_users
+    const pRes = await fetch(`${SUPABASE_URL}/rest/v1/pending_users?email=eq.${encodeURIComponent(email)}&select=id`, { headers: sbH() });
+    if (!pRes.ok) throw new Error('Erreur réseau');
+    const rows = await pRes.json();
+
+    if (rows.length === 0) {
+      showMsg(msg, "❌ Cet email n'a pas été invité. Contacte l'administrateur.", 'err');
+      return;
+    }
+
+    // Generate temp password
+    const tempPwd = generateTempPassword();
+
+    // Create account via admin API
+    const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers: { ...sbH(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: tempPwd, email_confirm: true, user_metadata: { must_change_password: true } })
+    });
+    const created = await createRes.json();
+    const userId = created.id || created.user?.id;
+
+    let accountReady = false;
+    if (userId) {
+      // Add profile
+      await sbFetch('/rest/v1/user_profiles', {
+        method: 'POST',
+        headers: { 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
+        body: JSON.stringify({ user_id: userId, email, role: 'user', must_change_password: true })
+      });
+      // Remove from pending
+      await fetch(`${SUPABASE_URL}/rest/v1/pending_users?id=eq.${rows[0].id}`, { method: 'DELETE', headers: sbH() });
+      accountReady = true;
+    } else if (created.msg?.includes('already') || created.code === 422) {
+      // Account already exists
+      accountReady = true;
+    }
+
+    if (accountReady) {
+      // Send password reset email so user gets a proper link
+      await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+        method: 'POST', headers: sbH(),
+        body: JSON.stringify({ email })
+      });
+
+      showMsg(msg,
+        `✅ Invitation confirmée pour ${email} !
+
+Un email t'a été envoyé avec un lien de connexion.
+
+Mot de passe temporaire : ${tempPwd}
+
+Connecte-toi avec ce mot de passe, puis change-le dans "Mon profil".`,
+        'ok'
+      );
+      // Also show the temp password prominently
+      const msgEl = document.getElementById('newuserMsg');
+      if (msgEl) {
+        msgEl.innerHTML = `<div style="margin-bottom:8px;">✅ Invitation confirmée pour <strong>${email}</strong> !</div>
+          <div style="margin-bottom:12px;">Un email de réinitialisation t'a été envoyé.</div>
+          <div style="background:#0f0f1a;border:1px solid #3a3a5a;border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:0.7rem;color:#7070a0;margin-bottom:4px;">MOT DE PASSE TEMPORAIRE</div>
+            <div style="font-size:1.4rem;font-weight:900;color:#f97316;letter-spacing:2px;">${tempPwd}</div>
+            <div style="font-size:0.7rem;color:#7070a0;margin-top:4px;">Conserve ce mot de passe — change-le ensuite dans Mon profil</div>
+          </div>
+          <div style="margin-top:10px;font-size:0.78rem;">
+            <button class="tracker-save-btn" style="width:auto;padding:10px 20px;" onclick="
+              document.getElementById('authEmail').value='${email}';
+              document.getElementById('authPassword').value='${tempPwd}';
+              showScreen('auth');
+            ">→ Aller à la page de connexion</button>
+          </div>`;
+        msgEl.className = 'form-msg ok';
+      }
+    } else {
+      showMsg(msg, 'Erreur lors de la création du compte : ' + (created.message || JSON.stringify(created).slice(0,100)), 'err');
+    }
+  } catch(e) {
+    showMsg(msg, 'Erreur : ' + e.message, 'err');
+  } finally {
+    if (btn) { btn.textContent = 'Vérifier mon invitation'; btn.disabled = false; }
+  }
 }
 
 // ── Init ──────────────────────────────────────────────────────
