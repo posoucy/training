@@ -273,8 +273,10 @@
 <div id="screen-programs" class="screen">
   <div class="programs-header"><div style="font-size:2.2rem">🏋️</div><h1>Mes Programmes</h1><p id="programsUserEmail"></p></div>
   <div class="programs-grid" id="programsGrid"></div>
-  <div style="text-align:right;margin-top:6px;display:flex;justify-content:flex-end;gap:8px;">
-    <button class="btn-small" onclick="promptApiKey()">🔑 Clé API Anthropic</button>
+  <div style="text-align:right;margin-top:6px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+    <button class="btn-small" onclick="promptApiKey()">🔑 Clé API</button>
+    <button class="btn-small" onclick="showProfileScreen()">👤 Mon profil</button>
+    <button class="btn-small" id="adminBtn" style="display:none;border-color:#a855f7;color:#c084fc;" onclick="showAdminScreen()">🛡️ Administration</button>
     <button class="btn-small btn-small-red" onclick="handleSignOut()">🚪 Se déconnecter</button>
   </div>
 </div>
@@ -392,7 +394,9 @@
     <div><div class="topbar-prog-name" id="topBarProgName"></div><div class="topbar-email" id="topBarEmail"></div></div>
     <div style="display:flex;gap:7px;flex-wrap:wrap;">
       <button class="btn-small" onclick="goToPrograms()">← Mes programmes</button>
-      <button class="btn-small" onclick="promptApiKey()" title="Configurer la clé API Anthropic">🔑</button>
+      <button class="btn-small" onclick="promptApiKey()" title="Clé API">🔑</button>
+      <button class="btn-small" onclick="showProfileScreen()">👤</button>
+      <button class="btn-small" id="adminBtnTop" style="display:none;border-color:#a855f7;color:#c084fc;" onclick="showAdminScreen()">🛡️</button>
       <button class="btn-small btn-small-red" onclick="handleSignOut()">🚪</button>
     </div>
   </div>
@@ -527,7 +531,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.46";
+const APP_VERSION = "v2.47";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -714,8 +718,10 @@ async function enterApp() {
   await ensureProfile();
 
   // Show admin button if user is admin
-  const adminBtn = document.getElementById('adminBtn');
-  if (adminBtn) adminBtn.style.display = isAdmin() ? 'inline-block' : 'none';
+  ['adminBtn','adminBtnTop'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.style.display = isAdmin() ? 'inline-block' : 'none';
+  });
 
   // If user must change password, redirect
   if (currentUserProfile?.must_change_password) {
@@ -730,8 +736,10 @@ async function enterApp() {
 }
 
 async function goToPrograms() {
-  const adminBtn = document.getElementById('adminBtn');
-  if (adminBtn) adminBtn.style.display = isAdmin() ? 'inline-block' : 'none';
+  ['adminBtn','adminBtnTop'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.style.display = isAdmin() ? 'inline-block' : 'none';
+  });
   const progs=await loadPrograms();
   renderProgramsScreen(progs);
   showScreen("programs");
