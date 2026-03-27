@@ -592,7 +592,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.52";
+const APP_VERSION = "v2.54-debug";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -698,20 +698,39 @@ async function handleSignIn() {
             err.textContent = "Bienvenue ! Ton email est autorisé. Choisis un mot de passe d'au moins 8 caractères.";
             err.style.display = "block";
           } else {
+            // Create account
             const signupRes = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
               method: 'POST', headers: sbH(),
               body: JSON.stringify({ email, password })
             });
             const sd = await signupRes.json();
-            if (sd.access_token || sd.user?.id) {
-              // Remove from pending
+
+            // Success: access_token OR user with id (email confirmation disabled)
+            // Also handle "User already registered" — means account exists, just try sign in
+            if (sd.access_token) {
               await fetch(`${SUPABASE_URL}/rest/v1/pending_users?id=eq.${rows[0].id}`, { method: 'DELETE', headers: sbH() });
-              // Sign in
+              currentSession = sd; localStorage.setItem("sb_session", JSON.stringify(sd));
+              await enterApp(); return;
+            } else if (sd.user?.id || sd.id) {
+              // User created but needs email confirmation OR auto-confirmed
+              await fetch(`${SUPABASE_URL}/rest/v1/pending_users?id=eq.${rows[0].id}`, { method: 'DELETE', headers: sbH() });
+              // Try immediate sign in
               const d2 = await signIn(email, password);
               if (d2.access_token) { await enterApp(); return; }
+              // Email confirmation required
+              err.textContent = "✅ Compte créé ! Vérifie ton email pour confirmer ton compte, puis connecte-toi.";
+              err.style.color = "#4ade80"; err.style.display = "block";
+            } else if (sd.msg?.includes("already registered") || sd.error?.includes("already registered")) {
+              // Already exists — just sign in
+              const d2 = await signIn(email, password);
+              if (d2.access_token) { await enterApp(); return; }
+              err.textContent = "Ce compte existe déjà. Utilise le bon mot de passe.";
+              err.style.display = "block";
+            } else {
+              // Show exact raw response for diagnosis
+              err.textContent = "Réponse Supabase : " + JSON.stringify(sd).slice(0, 300);
+              err.style.display = "block";
             }
-            err.textContent = sd.message || sd.error_description || "Erreur création de compte.";
-            err.style.display = "block";
           }
         } else {
           err.textContent = d.error_description || d.msg || "Identifiants incorrects ou accès non autorisé.";
