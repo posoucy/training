@@ -592,7 +592,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.50";
+const APP_VERSION = "v2.51";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -1526,15 +1526,17 @@ function refreshAdminButtons() {
 function isAdmin() { return currentUserProfile?.role === 'admin'; }
 
 async function ensureProfile() {
-  if (currentUserProfile) return; // Already loaded, never touch it
+  if (currentUserProfile) return;
   try {
-    // INSERT only — ON CONFLICT DO NOTHING ensures role is NEVER overwritten
+    const uid = currentSession?.user?.id;
+    const email = currentSession?.user?.email || '';
+    if (!uid) return;
+    // INSERT with ignore-duplicates — never touches existing rows
     await sbFetch('/rest/v1/user_profiles', {
       method: 'POST',
       headers: { 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
-      body: JSON.stringify({ user_id: currentSession.user.id, email: currentSession.user.email, role: 'user' })
+      body: JSON.stringify({ user_id: uid, email, role: 'user' })
     });
-    // Reload profile after potential insert
     await loadUserProfile();
   } catch(e) {}
 }
@@ -1619,13 +1621,27 @@ async function saveProfile() {
   const last_name = document.getElementById('profileLastName').value.trim();
   const age = parseInt(document.getElementById('profileAge').value) || null;
   const msg = document.getElementById('profileMsg');
+  const uid = currentSession?.user?.id;
+  const email = currentSession?.user?.email || currentUserProfile?.email || '';
+  if (!uid) { showMsg(msg, 'Session expirée, reconnecte-toi.', 'err'); return; }
   try {
-    const res = await sbFetch('/rest/v1/user_profiles', {
-      method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates' },
-      body: JSON.stringify({ user_id: currentSession.user.id, email: currentSession.user.email, first_name, last_name, age })
+    // Try PATCH first (update existing row)
+    const patchRes = await sbFetch(`/rest/v1/user_profiles?user_id=eq.${uid}`, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ first_name, last_name, age })
     });
-    if (res.ok) { showMsg(msg, '✅ Profil sauvegardé !', 'ok'); await loadUserProfile(); }
-    else showMsg(msg, 'Erreur lors de la sauvegarde.', 'err');
+    if (patchRes.ok) {
+      showMsg(msg, '✅ Profil sauvegardé !', 'ok');
+      await loadUserProfile();
+      // Update display name
+      const fullName = [first_name, last_name].filter(Boolean).join(' ');
+      const el = document.getElementById('profileDisplayName');
+      if (el && fullName) el.textContent = fullName;
+    } else {
+      const err = await patchRes.json().catch(() => ({}));
+      showMsg(msg, 'Erreur : ' + (err.message || patchRes.status), 'err');
+    }
   } catch(e) { showMsg(msg, 'Erreur : ' + e.message, 'err'); }
 }
 
@@ -1654,22 +1670,49 @@ async function loadActiveUsers() {
   const list = document.getElementById('adminUserList');
   if (!list) return;
   try {
-    const res = await sbFetch('/rest/v1/user_profiles?select=*&order=created_at.asc');
-    if (!res.ok) { list.innerHTML = '<div style="color:#f87171;font-size:0.8rem;">Erreur.</div>'; return; }
-    const users = await res.json();
-    if (!users.length) { list.innerHTML = '<div style="color:#6060a0;font-size:0.82rem;">Aucun utilisateur.</div>'; return; }
-    list.innerHTML = users.map(u => `
-      <div class="user-row">
-        <div class="user-row-info">
-          <div class="user-row-email">${u.email || '—'}</div>
-          <div class="user-row-meta">${[u.first_name, u.last_name].filter(Boolean).join(' ')}${u.age ? ' · ' + u.age + ' ans' : ''}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="role-badge ${u.role==='admin'?'role-admin':'role-user'}">${u.role==='admin'?'🛡️ Admin':'👤 User'}</span>
-          ${u.user_id !== currentSession?.user?.id ? `<button class="btn-form-danger" onclick="adminRemoveUser('${u.user_id}','${(u.email||'').replace(/'/g,"\'")}')">✕</button>` : ''}
-        </div>
-      </div>`).join('');
+    // Use auth admin endpoint — bypasses RLS completely
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+      headers: { ...sbH(currentSession?.access_token), 'apikey': SUPABASE_KEY }
+    });
+    if (!res.ok) {
+      // Fallback: try user_profiles with own user only
+      const res2 = await sbFetch('/rest/v1/user_profiles?select=*&order=created_at.asc');
+      if (!res2.ok) { list.innerHTML = '<div style="color:#f87171;font-size:0.8rem;">Accès refusé — rôle admin requis dans Supabase.</div>'; return; }
+      const users2 = await res2.json();
+      renderUserList(list, users2); return;
+    }
+    const data = await res.json();
+    const authUsers = data.users || [];
+    // Cross-reference with profiles
+    const profRes = await sbFetch('/rest/v1/user_profiles?select=*');
+    const profiles = profRes.ok ? await profRes.json() : [];
+    const profMap = {};
+    profiles.forEach(p => profMap[p.user_id] = p);
+    const merged = authUsers.map(u => ({
+      user_id: u.id, email: u.email,
+      first_name: profMap[u.id]?.first_name || '',
+      last_name: profMap[u.id]?.last_name || '',
+      age: profMap[u.id]?.age || null,
+      role: profMap[u.id]?.role || 'user',
+      created_at: u.created_at
+    }));
+    renderUserList(list, merged);
   } catch(e) { list.innerHTML = '<div style="color:#f87171;">Erreur : ' + e.message + '</div>'; }
+}
+
+function renderUserList(list, users) {
+  if (!users.length) { list.innerHTML = '<div style="color:#6060a0;font-size:0.82rem;">Aucun utilisateur.</div>'; return; }
+  list.innerHTML = users.map(u => `
+    <div class="user-row">
+      <div class="user-row-info">
+        <div class="user-row-email">${u.email || '—'}</div>
+        <div class="user-row-meta">${[u.first_name, u.last_name].filter(Boolean).join(' ')}${u.age ? ' · ' + u.age + ' ans' : ''}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="role-badge ${u.role==='admin'?'role-admin':'role-user'}">${u.role==='admin'?'🛡️ Admin':'👤 User'}</span>
+        ${u.user_id !== currentSession?.user?.id ? `<button class="tracker-reset-btn" style="width:auto;padding:6px 12px;font-size:0.75rem;margin:0;" onclick="adminRemoveUser('${u.user_id}','${(u.email||'').replace(/'/g,"\'")}')">✕ Retirer</button>` : '<span style="font-size:0.7rem;color:#5050a0;">Moi</span>'}
+      </div>
+    </div>`).join('');
 }
 
 async function loadPendingUsers() {
