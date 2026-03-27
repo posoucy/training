@@ -449,7 +449,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.32";
+const APP_VERSION = "v2.33";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -1003,43 +1003,42 @@ async function buildGrid(){
     return;
   }
   grid.innerHTML="";
-  // Sort days chronologically: find today's position in the week schedule,
-  // then order training days starting from the next upcoming one
   const allDays=[...currentProgram.config.days];
-  const today=new Date(); today.setHours(0,0,0,0);
-  const {start:weekStart}=getWeekDates(currentWeek);
 
-  // Find which day-index (0=Mon..6=Sun) is today within this week
-  const todayWeekIdx = (() => {
-    for(let i=0;i<7;i++){
-      const d=new Date(weekStart); d.setDate(weekStart.getDate()+i);
-      if(d.getTime()===today.getTime()) return i;
-    }
-    return -1; // not in this week
-  })();
+  // Get today's index in the week (Mon=0 ... Sun=6)
+  // JS getDay(): 0=Sun,1=Mon,...,6=Sat → convert to Mon-based
+  const todayMon = (new Date().getDay() + 6) % 7;
 
-  // Build ordered list of training labels starting from today onwards (wrap around)
-  const orderedLabels=[];
-  if(todayWeekIdx >= 0){
-    // Go through week starting from today, collect training day labels in order
-    for(let offset=0;offset<7;offset++){
-      const idx=(todayWeekIdx+offset)%7;
-      const label=weekSchedule[idx]||"repos";
-      if(label!=="repos" && !orderedLabels.includes(label)) orderedLabels.push(label);
+  // Only sort chronologically if we are in the current real week
+  const { start: wStart } = getWeekDates(currentWeek);
+  const { start: curStart } = getWeekDates(currentWeek); // same week check
+  const realToday = new Date(); realToday.setHours(0,0,0,0);
+  const weekMonday = new Date(wStart); weekMonday.setHours(0,0,0,0);
+  const weekSunday = new Date(weekMonday); weekSunday.setDate(weekMonday.getDate()+6);
+  const isCurrentWeek = realToday >= weekMonday && realToday <= weekSunday;
+
+  let days;
+  if (isCurrentWeek) {
+    // Build ordered labels starting from today's day-of-week, wrapping through the week
+    const orderedLabels = [];
+    for (let offset = 0; offset < 7; offset++) {
+      const idx = (todayMon + offset) % 7;
+      const label = weekSchedule[idx] || "repos";
+      if (label !== "repos" && !orderedLabels.includes(label)) orderedLabels.push(label);
     }
-    // Add any remaining labels not in this week's schedule
-    allDays.forEach(d=>{ if(!orderedLabels.includes(d.label)) orderedLabels.push(d.label); });
+    // Append any training days not assigned in the schedule
+    allDays.forEach(d => { if (!orderedLabels.includes(d.label)) orderedLabels.push(d.label); });
+
+    days = [...allDays].sort((a, b) => {
+      const ai = orderedLabels.indexOf(a.label), bi = orderedLabels.indexOf(b.label);
+      if (ai === -1 && bi === -1) return a.id - b.id;
+      if (ai === -1) return 1; if (bi === -1) return -1;
+      return ai - bi;
+    });
+  } else {
+    // Past or future week — sort by id
+    days = [...allDays].sort((a, b) => a.id - b.id);
   }
-
-  // Sort days array based on orderedLabels, fallback to id order
-  const days = orderedLabels.length > 0
-    ? [...allDays].sort((a,b)=>{
-        const ai=orderedLabels.indexOf(a.label), bi=orderedLabels.indexOf(b.label);
-        if(ai===-1&&bi===-1) return a.id-b.id;
-        if(ai===-1) return 1; if(bi===-1) return -1;
-        return ai-bi;
-      })
-    : [...allDays].sort((a,b)=>a.id-b.id);
   for(const day of days){
     const col=DAY_COLORS[(day.id-1)%DAY_COLORS.length];
     const card=document.createElement("div"); card.className="day-card";
