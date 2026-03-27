@@ -527,7 +527,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.45";
+const APP_VERSION = "v2.46";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -688,8 +688,13 @@ async function restoreSession() {
   }catch(e){return false;}
 }
 
+let cachedPrograms = [];
+
 async function loadPrograms() {
-  try{const res=await sbFetch("/rest/v1/programs?select=*&order=created_at.asc");if(res.ok)return await res.json();}catch(e){}
+  try {
+    const res = await sbFetch("/rest/v1/programs?select=*&order=created_at.asc");
+    if (res.ok) { cachedPrograms = await res.json(); return cachedPrograms; }
+  } catch(e) {}
   return [];
 }
 
@@ -764,12 +769,19 @@ async function confirmDelete(id,name) {
 }
 
 async function selectProgram(id) {
-  const progs=await loadPrograms();
-  const prog=progs.find(p=>p.id===id); if(!prog) return;
-  // Supabase JSONB can return config as string — parse if needed
+  // Use cache first — avoids slow reload on every card click
+  let prog = cachedPrograms.find(p => p.id === id);
+  if (!prog) {
+    // Fallback: fetch just this program
+    try {
+      const res = await sbFetch(`/rest/v1/programs?id=eq.${id}&select=*`);
+      if (res.ok) { const rows = await res.json(); prog = rows[0]; }
+    } catch(e) {}
+  }
+  if (!prog) return;
   if (typeof prog.config === "string") { try { prog.config = JSON.parse(prog.config); } catch(e) {} }
-  currentProgram=prog; currentWeek=1;
-  try{const sw=localStorage.getItem(`prog_${id}_week`);if(sw) currentWeek=Math.max(1,Math.min(prog.weeks,parseInt(sw)));}catch(e){}
+  currentProgram = prog; currentWeek = 1;
+  try { const sw = localStorage.getItem(`prog_${id}_week`); if (sw) currentWeek = Math.max(1, Math.min(prog.weeks, parseInt(sw))); } catch(e) {}
   launchWorkout();
 }
 
@@ -1441,28 +1453,17 @@ async function loadUserProfile() {
 function isAdmin() { return currentUserProfile?.role === 'admin'; }
 
 async function ensureProfile() {
-  // Only create if truly doesn't exist — never overwrite role
-  if (!currentUserProfile) {
-    try {
-      // Check first with a direct select to avoid race condition
-      const check = await sbFetch(`/rest/v1/user_profiles?user_id=eq.${currentSession.user.id}&select=user_id,role`);
-      if (check.ok) {
-        const rows = await check.json();
-        if (rows.length > 0) {
-          // Profile exists but loadUserProfile didn't get it — reload
-          currentUserProfile = rows[0];
-          return;
-        }
-      }
-      // Truly doesn't exist — create with user role (use ignore to not overwrite)
-      await sbFetch('/rest/v1/user_profiles', {
-        method: 'POST',
-        headers: { 'Prefer': 'return=minimal,resolution=ignore-duplicates' },
-        body: JSON.stringify({ user_id: currentSession.user.id, email: currentSession.user.email, role: 'user' })
-      });
-      await loadUserProfile();
-    } catch(e) {}
-  }
+  if (currentUserProfile) return; // Already loaded, never touch it
+  try {
+    // INSERT only — ON CONFLICT DO NOTHING ensures role is NEVER overwritten
+    await sbFetch('/rest/v1/user_profiles', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify({ user_id: currentSession.user.id, email: currentSession.user.email, role: 'user' })
+    });
+    // Reload profile after potential insert
+    await loadUserProfile();
+  } catch(e) {}
 }
 
 // ── Set Password ──────────────────────────────────────────────
