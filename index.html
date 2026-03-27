@@ -253,7 +253,12 @@
 
 <div id="screen-auth" class="screen active">
   <div class="auth-box">
-    <div class="auth-logo"><div style="font-size:2rem">🏋️</div><h1>Gym Tracker</h1><p>Accès sur invitation seulement</p></div>
+    <div class="auth-logo">
+      <div style="font-size:2rem">🏋️</div>
+      <h1>Gym Tracker</h1>
+      <p>Accès sur invitation seulement</p>
+      <div id="authVersion" style="display:inline-block;margin-top:8px;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:999px;padding:3px 12px;font-size:0.7rem;color:#5050a0;font-weight:600;letter-spacing:0.05em;"></div>
+    </div>
     <div class="auth-error" id="authError"></div>
     <div class="auth-field"><label class="auth-label">Email</label><input class="auth-input" id="authEmail" type="email" placeholder="ton@email.com" /></div>
     <div class="auth-field"><label class="auth-label">Mot de passe</label><input class="auth-input" id="authPassword" type="password" placeholder="••••••••" /></div>
@@ -440,6 +445,7 @@
 </div>
 
 <script>
+const APP_VERSION = "v2.31";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -1225,6 +1231,9 @@ document.getElementById("editProgOverlay")?.addEventListener("click", function(e
 
 // ── Init ──────────────────────────────────────────────────────
 (async()=>{
+  // Display version
+  const vEl = document.getElementById("authVersion");
+  if (vEl) vEl.textContent = APP_VERSION;
   try {
     const ok = await restoreSession();
     if (ok) { await enterApp(); }
