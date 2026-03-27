@@ -527,7 +527,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.41";
+const APP_VERSION = "v2.42";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -714,7 +714,7 @@ async function enterApp() {
 
   // If user must change password, redirect
   if (currentUserProfile?.must_change_password) {
-    document.getElementById('setpwdSubtitle').textContent = 'Bienvenue ! Choisis ton mot de passe pour accéder à l'app.';
+    document.getElementById('setpwdSubtitle').textContent = "Bienvenue ! Choisis ton mot de passe pour accéder à l'app.";
     showScreen('setpassword');
     return;
   }
