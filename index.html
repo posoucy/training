@@ -449,7 +449,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.36-debug";
+const APP_VERSION = "v2.36";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -637,7 +637,7 @@ async function selectProgram(id) {
   launchWorkout();
 }
 
-function launchWorkout() {
+async function launchWorkout() {
   // Ensure config is always a proper object
   if (typeof currentProgram.config === "string") {
     try { currentProgram.config = JSON.parse(currentProgram.config); } catch(e) {}
@@ -648,8 +648,11 @@ function launchWorkout() {
   document.getElementById("workoutTitle").textContent=currentProgram.name;
   document.getElementById("workoutDesc").textContent=cfg.description||"";
   document.getElementById("workoutBadges").innerHTML=[`📅 ${(cfg.days||[]).length}j/sem`,`🎯 ${cfg.goal||""}`,cfg.level||"",`📆 ${currentProgram.weeks} sem.`].map(b=>`<span class="badge">${b}</span>`).join("");
-  loadWeekSchedule().then(()=>{renderWeekSchedule();updateWeekTitle();});
-  buildGrid();
+  // Must await schedule load before buildGrid so sort has weekSchedule populated
+  await loadWeekSchedule();
+  renderWeekSchedule();
+  updateWeekTitle();
+  await buildGrid();
   showScreen("workout");
 }
 
@@ -1018,21 +1021,7 @@ async function buildGrid(){
   const rawDay = new Date().getDay(); // JS: 0=Sun, 1=Mon, ..., 6=Sat
   const todayIdx = (rawDay === 0) ? 6 : rawDay - 1;
 
-  // DEBUG — show values in a visible div
-  let dbg = document.getElementById("sortDebug");
-  if (!dbg) { dbg = document.createElement("div"); dbg.id="sortDebug"; dbg.style.cssText="background:#1a1a2e;border:1px solid #f97316;border-radius:10px;padding:12px;margin-bottom:14px;font-size:0.72rem;color:#fb923c;font-family:monospace;white-space:pre-wrap;"; grid.before(dbg); }
-  const { start: dbgStart } = getWeekDates(currentWeek);
-  const dbgNow = new Date(); dbgNow.setHours(0,0,0,0);
-  const dbgMon = new Date(dbgStart); dbgMon.setHours(0,0,0,0);
-  const dbgSun = new Date(dbgMon); dbgSun.setDate(dbgMon.getDate()+6);
-  dbg.textContent = [
-    "rawDay (JS getDay)=" + rawDay + " | todayIdx(Mon=0)=" + todayIdx,
-    "today=" + dbgNow.toDateString(),
-    "weekStart=" + dbgMon.toDateString() + " weekEnd=" + dbgSun.toDateString(),
-    "isCurrentWeek=" + (dbgNow >= dbgMon && dbgNow <= dbgSun),
-    "weekSchedule=" + JSON.stringify(weekSchedule),
-    "todayLabel=" + (weekSchedule[todayIdx]||"?"),
-  ].join("\n");
+
 
   // Check if the displayed week contains today
   const { start: wStart } = getWeekDates(currentWeek);
