@@ -267,6 +267,10 @@
     <div class="auth-field"><label class="auth-label">Email</label><input class="auth-input" id="authEmail" type="email" placeholder="ton@email.com" /></div>
     <div class="auth-field"><label class="auth-label">Mot de passe</label><input class="auth-input" id="authPassword" type="password" placeholder="••••••••" /></div>
     <button class="btn-primary" onclick="handleSignIn()">Se connecter</button>
+    <div style="display:flex;justify-content:center;gap:24px;margin-top:16px;flex-wrap:wrap;">
+      <button onclick="showScreen('forgot')" style="background:none;border:none;color:#6060a0;font-size:0.78rem;cursor:pointer;text-decoration:underline;padding:0;">Mot de passe oublié ?</button>
+      <button onclick="showScreen('newuser')" style="background:none;border:none;color:#6060a0;font-size:0.78rem;cursor:pointer;text-decoration:underline;padding:0;">Première connexion ?</button>
+    </div>
   </div>
 </div>
 
@@ -610,7 +614,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.55";
+const APP_VERSION = "v2.56";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
