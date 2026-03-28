@@ -639,7 +639,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.62";
+const APP_VERSION = "v2.65";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -1814,11 +1814,17 @@ async function adminAddUser() {
     if (!redirectTo.endsWith('/')) redirectTo += '/';
 
     // Use Supabase invite API — sends email with setup link automatically
-    const inviteRes = await fetch(
-      `${SUPABASE_URL}/auth/v1/admin/invite?redirect_to=${encodeURIComponent(redirectTo)}`,
-      { method: 'POST', headers: sbAdmin(), body: JSON.stringify({ email }) }
-    );
-    const invited = await inviteRes.json();
+    const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/invite`, {
+      method: 'POST',
+      headers: sbAdmin(),
+      body: JSON.stringify({ email, data: {}, redirect_to: redirectTo })
+    });
+    const inviteText = await inviteRes.text();
+    let invited = {};
+    try { invited = JSON.parse(inviteText); } catch(e) {
+      // Non-JSON response — likely HTML error page
+      throw new Error('Réponse invalide de Supabase : ' + inviteText.slice(0, 150));
+    }
     const userId = invited.id || invited.user?.id;
 
     if (userId) {
@@ -1863,9 +1869,39 @@ Configure le SMTP dans Supabase → Project Settings → Auth.`,
   }
 }
 async function adminRemoveUser(userId, email) {
-  if (!confirm(`Supprimer l'utilisateur ${email} ?`)) return;
-  await sbFetch(`/rest/v1/user_profiles?user_id=eq.${userId}`, { method: 'DELETE' });
-  await loadActiveUsers();
+  if (!confirm(`Supprimer ${email} et toutes ses données (programmes, suivi) ? Cette action est irréversible.`)) return;
+
+  const list = document.getElementById('adminUserList');
+  if (list) list.innerHTML = '<div style="color:#7070a0;font-size:0.82rem;">Suppression en cours…</div>';
+
+  try {
+    // 1. Delete all workout_tracker data (all weeks, all programs)
+    await fetch(`${SUPABASE_URL}/rest/v1/workout_tracker?user_id=eq.${userId}`,
+      { method: 'DELETE', headers: sbAdmin() });
+
+    // 2. Delete all programs
+    await fetch(`${SUPABASE_URL}/rest/v1/programs?user_id=eq.${userId}`,
+      { method: 'DELETE', headers: sbAdmin() });
+
+    // 4. Delete user profile
+    await fetch(`${SUPABASE_URL}/rest/v1/user_profiles?user_id=eq.${userId}`,
+      { method: 'DELETE', headers: sbAdmin() });
+
+    // 5. Delete auth user (requires service_role)
+    const authRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`,
+      { method: 'DELETE', headers: sbAdmin() });
+
+    if (authRes.ok || authRes.status === 204) {
+      await loadActiveUsers();
+    } else {
+      const err = await authRes.text();
+      alert(`Profil supprimé mais erreur suppression auth: ${err.slice(0,100)}`);
+      await loadActiveUsers();
+    }
+  } catch(e) {
+    alert('Erreur : ' + e.message);
+    await loadActiveUsers();
+  }
 }
 
 async function adminRemovePending(id, email) {
