@@ -603,7 +603,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.72";
+const APP_VERSION = "v2.73";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -790,7 +790,6 @@ async function deleteProgram(id) { await sbFetch(`/rest/v1/programs?id=eq.${id}`
 async function enterApp() {
   document.getElementById("programsUserEmail").textContent=currentSession?.user?.email||"";
   // Parallel load for speed
-  loadEmailConfig();
   await Promise.all([loadApiKeyRemote(), loadUserProfile()]);
   await ensureProfile();
 
@@ -1691,7 +1690,6 @@ async function showAdminScreen() {
   const current = getApiKey();
   const keyInput = document.getElementById('adminApiKeyInput');
   if (keyInput && current) keyInput.value = current;
-  loadEmailConfig();
   await loadAdminData();
 }
 
