@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>Gym Tracker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0f13; color: #e8e8f0; min-height: 100vh; }
@@ -470,57 +469,6 @@
   <div style="max-width:660px;margin:0 auto;padding-top:8px;">
     <button class="btn-small" onclick="goToPrograms()" style="margin-bottom:20px;">← Mes programmes</button>
 
-    <!-- Header -->
-    <div style="text-align:center;margin-bottom:24px;">
-      <div style="width:66px;height:66px;border-radius:50%;background:linear-gradient(135deg,#a855f7,#c084fc);display:flex;align-items:center;justify-content:center;font-size:1.9rem;margin:0 auto 10px;">🛡️</div>
-      <div style="font-size:1.15rem;font-weight:800;color:#e8e8f0;">Administration</div>
-      <div style="font-size:0.78rem;color:#6060a0;margin-top:3px;">Gestion des utilisateurs</div>
-    </div>
-
-    <!-- Config Email -->
-    <div class="tracker-section" style="margin-bottom:12px;">
-      <h4>📧 Configuration des emails (EmailJS)</h4>
-      <div class="tracker-row">
-        <div style="font-size:0.72rem;color:#5050a0;line-height:1.6;">
-          💡 Pour envoyer des emails d'invitation, crée un compte gratuit sur <strong style="color:#7070a0">emailjs.com</strong>, crée un service email et un template avec les variables : <code style="color:#a855f7">to_email</code>, <code style="color:#a855f7">app_url</code>, <code style="color:#a855f7">app_name</code>.
-        </div>
-        <div class="tracker-field">
-          <label class="tracker-label">Service ID</label>
-          <input class="tracker-input" id="emailjsServiceId" type="text" placeholder="service_xxxxxxx" />
-        </div>
-        <div class="tracker-field">
-          <label class="tracker-label">Template ID</label>
-          <input class="tracker-input" id="emailjsTemplateId" type="text" placeholder="template_xxxxxxx" />
-        </div>
-        <div class="tracker-field">
-          <label class="tracker-label">Public Key</label>
-          <input class="tracker-input" id="emailjsPublicKey" type="text" placeholder="xxxxxxxxxxxxxxxxxxxx" />
-        </div>
-        <div>
-          <button onclick="saveEmailJsConfig()" class="tracker-save-btn">💾 Sauvegarder la config email</button>
-          <div class="form-msg" id="emailjsMsg" style="margin-top:8px;"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Clé API Anthropic -->
-    <div class="tracker-section" style="margin-bottom:12px;">
-      <h4>🔑 Clé API Anthropic</h4>
-      <div class="tracker-row">
-        <div class="tracker-field">
-          <label class="tracker-label">Clé API (sk-ant-…)</label>
-          <input class="tracker-input" id="adminApiKeyInput" type="password" placeholder="sk-ant-api03-…" />
-        </div>
-        <div>
-          <button onclick="saveApiKeyFromAdmin()" class="tracker-save-btn">🔑 Sauvegarder la clé API</button>
-          <div class="form-msg" id="adminApiKeyMsg" style="margin-top:8px;"></div>
-        </div>
-        <div style="font-size:0.72rem;color:#5050a0;line-height:1.5;">
-          💡 Nécessaire pour générer les programmes d'entraînement avec l'IA. Créer une clé sur <strong style="color:#7070a0">console.anthropic.com</strong>.
-        </div>
-      </div>
-    </div>
-
     <!-- Ajouter utilisateur -->
     <div class="tracker-section" style="margin-bottom:12px;">
       <h4>➕ Ajouter un utilisateur</h4>
@@ -546,17 +494,6 @@
         <div style="color:#6060a0;font-size:0.82rem;">Chargement…</div>
       </div>
     </div>
-
-    <!-- Invitations en attente -->
-    <div class="tracker-section" style="margin-bottom:12px;">
-      <h4>⏳ Invitations en attente</h4>
-      <div id="adminPendingList" style="display:flex;flex-direction:column;gap:8px;">
-        <div style="color:#6060a0;font-size:0.82rem;">Chargement…</div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- ── Profile Screen ── -->
 <div id="screen-profile" class="screen">
   <div style="max-width:560px;margin:0 auto;padding-top:8px;">
@@ -666,7 +603,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.70";
+const APP_VERSION = "v2.71";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -718,56 +655,14 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5bGxiZm9yaG5nbmV1aWhmYmt0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDIwNzUyNCwiZXhwIjoyMDg5NzgzNTI0fQ.ym4u484jpFu-F6zMipRwu-BMvnwV1n3Tui6QpKBjSv4";
 function sbAdmin() { return {"Content-Type":"application/json","apikey":SUPABASE_SERVICE_KEY,"Authorization":"Bearer "+SUPABASE_SERVICE_KEY}; }
 
-// ── EmailJS Config ─────────────────────────────────────────────
-// Configure in Admin → Paramètres email
-let EMAILJS_SERVICE_ID = '';
-let EMAILJS_TEMPLATE_ID = '';
-let EMAILJS_PUBLIC_KEY = '';
-
-function loadEmailConfig() {
-  try {
-    const cfg = localStorage.getItem('emailjs_config');
-    if (cfg) {
-      const parsed = JSON.parse(cfg);
-      EMAILJS_SERVICE_ID = parsed.service_id || '';
-      EMAILJS_TEMPLATE_ID = parsed.template_id || '';
-      EMAILJS_PUBLIC_KEY = parsed.public_key || '';
-    }
-  } catch(e) {}
-}
-
-function saveEmailConfig(serviceId, templateId, publicKey) {
-  try {
-    localStorage.setItem('emailjs_config', JSON.stringify({
-      service_id: serviceId, template_id: templateId, public_key: publicKey
-    }));
-    EMAILJS_SERVICE_ID = serviceId;
-    EMAILJS_TEMPLATE_ID = templateId;
-    EMAILJS_PUBLIC_KEY = publicKey;
-  } catch(e) {}
-}
-
 async function sendInvitationEmail(toEmail, appUrl) {
   try {
-    // Try /auth/v1/invite (Supabase hosted projects)
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
-      method: 'POST',
-      headers: sbAdmin(),
-      body: JSON.stringify({ email: toEmail, redirect_to: appUrl })
-    });
-    const text = await res.text();
-    let data = {};
-    try { data = JSON.parse(text); } catch(e) {}
-    // Success if we get a user back or 200/204
-    if (res.ok && (data.id || data.user?.id)) return true;
-    // Some Supabase versions return 422 "User already registered" — that's also ok
-    if (data.code === 422 || (data.msg || '').toLowerCase().includes('already')) return true;
-    console.log('invite response:', res.status, text.slice(0, 200));
-    return false;
-  } catch(e) {
-    console.log('invite error:', e.message);
-    return false;
-  }
+    const res = await fetch(
+      `${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(appUrl)}`,
+      { method: 'POST', headers: sbAdmin(), body: JSON.stringify({ email: toEmail }) }
+    );
+    return res.ok || res.status === 204;
+  } catch(e) { return false; }
 }
 let currentSession = null, currentProgram = null, currentWeek = 1, weekSchedule = [], weekEditMode = false;
 
@@ -1795,38 +1690,11 @@ async function showAdminScreen() {
   const current = getApiKey();
   const keyInput = document.getElementById('adminApiKeyInput');
   if (keyInput && current) keyInput.value = current;
-  // Pre-fill EmailJS config
   loadEmailConfig();
-  const sEl = document.getElementById('emailjsServiceId');
-  const tEl = document.getElementById('emailjsTemplateId');
-  const pEl = document.getElementById('emailjsPublicKey');
-  if (sEl) sEl.value = EMAILJS_SERVICE_ID;
-  if (tEl) tEl.value = EMAILJS_TEMPLATE_ID;
-  if (pEl) pEl.value = EMAILJS_PUBLIC_KEY;
   await loadAdminData();
 }
 
-function saveEmailJsConfig() {
-  const serviceId = document.getElementById('emailjsServiceId')?.value.trim();
-  const templateId = document.getElementById('emailjsTemplateId')?.value.trim();
-  const publicKey = document.getElementById('emailjsPublicKey')?.value.trim();
-  const msg = document.getElementById('emailjsMsg');
-  if (!serviceId || !templateId || !publicKey) { showMsg(msg, 'Remplis tous les champs EmailJS.', 'err'); return; }
-  saveEmailConfig(serviceId, templateId, publicKey);
-  showMsg(msg, '✅ Configuration email sauvegardée !', 'ok');
-}
-
-async function saveApiKeyFromAdmin() {
-  const key = document.getElementById('adminApiKeyInput')?.value.trim();
-  const msg = document.getElementById('adminApiKeyMsg');
-  if (!key) { showMsg(msg, 'Entre une clé API valide.', 'err'); return; }
-  if (!key.startsWith('sk-')) { showMsg(msg, 'Clé invalide — elle doit commencer par sk-ant-…', 'err'); return; }
-  saveApiKeyLocal(key);
-  await saveApiKeyRemote(key);
-  showMsg(msg, '✅ Clé API sauvegardée sur tous les appareils !', 'ok');
-}
-
-async function loadAdminData() { await loadActiveUsers(); await loadPendingUsers(); }
+async function loadAdminData() { await loadActiveUsers(); }
 
 async function loadActiveUsers() {
   const list = document.getElementById('adminUserList');
@@ -1877,28 +1745,6 @@ function renderUserList(list, users) {
     </div>`).join('');
 }
 
-async function loadPendingUsers() {
-  const list = document.getElementById('adminPendingList');
-  if (!list) return;
-  try {
-    const res = await sbFetch('/rest/v1/pending_users?select=*&order=created_at.asc');
-    if (!res.ok) { list.innerHTML = '<div style="color:#f87171;">Erreur.</div>'; return; }
-    const pending = await res.json();
-    if (!pending.length) { list.innerHTML = '<div style="color:#6060a0;font-size:0.82rem;">Aucune invitation en attente.</div>'; return; }
-    list.innerHTML = pending.map(p => `
-      <div class="user-row">
-        <div class="user-row-info">
-          <div class="user-row-email">${p.email}</div>
-          <div class="user-row-meta">Ajouté le ${new Date(p.created_at).toLocaleDateString('fr-CA')}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="pending-badge">⏳ En attente</span>
-          <button class="btn-form-danger" onclick="adminRemovePending('${p.id}','${p.email.replace(/'/g,"\'")}')">✕</button>
-        </div>
-      </div>`).join('');
-  } catch(e) { list.innerHTML = '<div style="color:#f87171;">Erreur.</div>'; }
-}
-
 async function adminAddUser() {
   const email = document.getElementById('adminNewEmail')?.value.trim().toLowerCase();
   const msg = document.getElementById('adminAddMsg');
@@ -1919,7 +1765,7 @@ async function adminAddUser() {
     let appUrl = window.location.origin + window.location.pathname;
     if (!appUrl.endsWith('/')) appUrl += '/';
 
-    // 3. Send invitation email via EmailJS
+    // 3. Send invitation email via Supabase recover
     const emailSent = await sendInvitationEmail(email, appUrl);
 
     // 4. Show result with "Première connexion" link
@@ -1982,11 +1828,7 @@ async function adminRemoveUser(userId, email) {
   }
 }
 
-async function adminRemovePending(id, email) {
-  if (!confirm(`Retirer l'invitation de ${email} ?`)) return;
-  await sbFetch(`/rest/v1/pending_users?id=eq.${id}`, { method: 'DELETE' });
-  await loadPendingUsers();
-}
+
 
 // ── Helpers ───────────────────────────────────────────────────
 function showMsg(el, text, type) {
