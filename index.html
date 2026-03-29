@@ -24,11 +24,11 @@
   .btn-primary:hover { opacity: 0.88; }
   .btn-secondary { width: 100%; background: #1e1e2e; border: 1px solid #3a3a5a; border-radius: 10px; color: #b0b0cc; font-size: 0.85rem; font-weight: 600; padding: 12px; cursor: pointer; margin-top: 8px; min-height: 44px; transition: all 0.15s; }
   .btn-secondary:hover { border-color: #6060aa; color: #e8e8f0; }
-  #topBar { display: none; max-width: 1100px; margin: 0 auto 16px; background: #16161f; border: 1px solid #2a2a3a; border-radius: 14px; padding: 10px 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  #topBar { display: none; max-width: 1100px; margin: 0 auto 16px; background: #16161f; border: 1px solid #2a2a3a; border-radius: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   .topbar-left { display: flex; align-items: center; gap: 10px; }
   .topbar-page-name { font-weight: 700; font-size: 0.88rem; color: #e8e8f0; }
-  .topbar-email { font-size: 0.72rem; color: #6060a0; }
   .topbar-prog-name { font-weight: 700; font-size: 0.88rem; }
+  .topbar-email { font-size: 0.72rem; color: #6060a0; }
   .btn-small { background: #1e1e2e; border: 1px solid #3a3a5a; border-radius: 8px; color: #9090aa; font-size: 0.72rem; font-weight: 600; padding: 6px 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
   .btn-small:hover { border-color: #a855f7; color: #c084fc; }
   .btn-small-red:hover { border-color: #f87171 !important; color: #f87171 !important; }
@@ -257,6 +257,23 @@
 </head>
 <body>
 
+<!-- ── Unified Top Bar (outside all screens) ── -->
+<div id="topBar" style="display:none;padding:10px 16px;">
+  <div class="topbar-left">
+    <div>
+      <div class="topbar-page-name" id="topBarPageName"></div>
+      <div class="topbar-email" id="topBarEmail"></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+    <button class="btn-small" id="topBarBackBtn" style="display:none;" onclick="topBarBack()">← Retour</button>
+    <button class="btn-small" id="topBarPrograms" style="display:none;" onclick="goToPrograms()">🏋️ Programmes</button>
+    <button class="btn-small" id="topBarProfil" style="display:none;" onclick="showProfileScreen()">👤 Profil</button>
+    <button class="btn-small" id="adminBtnTop" style="display:none;border-color:#a855f7;color:#c084fc;" onclick="showAdminScreen()">🛡️ Admin</button>
+    <button class="btn-small btn-small-red" id="topBarLogout" style="display:none;" onclick="handleSignOut()">🚪</button>
+  </div>
+</div>
+
 <div id="screen-auth" class="screen active">
   <div class="auth-box">
     <div class="auth-logo">
@@ -391,21 +408,6 @@
 </div>
 
 <div id="screen-workout" class="screen">
-  <div id="topBar">
-    <div class="topbar-left">
-      <div>
-        <div class="topbar-page-name" id="topBarPageName">Mes Programmes</div>
-        <div class="topbar-email" id="topBarEmail"></div>
-      </div>
-    </div>
-    <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
-      <button class="btn-small" id="topBarBackBtn" style="display:none;" onclick="topBarBack()">← Retour</button>
-      <button class="btn-small" id="topBarPrograms" onclick="goToPrograms()">🏋️ Programmes</button>
-      <button class="btn-small" onclick="showProfileScreen()">👤 Profil</button>
-      <button class="btn-small" id="adminBtnTop" style="display:none;border-color:#a855f7;color:#c084fc;" onclick="showAdminScreen()">🛡️ Admin</button>
-      <button class="btn-small btn-small-red" onclick="handleSignOut()">🚪</button>
-    </div>
-  </div>
   <div class="workout-inner">
     <div class="header"><h1 id="workoutTitle"></h1><p id="workoutDesc"></p><div class="badges" id="workoutBadges"></div></div>
     <div class="week-schedule">
@@ -472,7 +474,6 @@
 <div id="screen-admin" class="screen">
   <div style="max-width:660px;margin:0 auto;padding-top:8px;">
 
-
     <!-- Header -->
     <div style="text-align:center;margin-bottom:24px;">
       <div style="width:66px;height:66px;border-radius:50%;background:linear-gradient(135deg,#a855f7,#c084fc);display:flex;align-items:center;justify-content:center;font-size:1.9rem;margin:0 auto 10px;">🛡️</div>
@@ -537,7 +538,6 @@
 <!-- ── Profile Screen ── -->
 <div id="screen-profile" class="screen">
   <div style="max-width:560px;margin:0 auto;padding-top:8px;">
-
 
     <!-- Avatar header -->
     <div style="text-align:center;margin-bottom:24px;">
@@ -710,10 +710,10 @@ function showScreen(name) {
     el.classList.add("active");
     window.scrollTo(0,0);
   }
+  // Show topBar on all screens except auth/login flows
+  const noTopBar = ["auth","setpassword","forgot","newuser","create"];
   const tb = document.getElementById("topBar");
-  const noBar = ["auth","setpassword","forgot","newuser","create"];
-  if (tb) tb.style.display = noBar.includes(name) ? "none" : "flex";
-  // Update topBar context per screen
+  if (tb) tb.style.display = noTopBar.includes(name) ? "none" : "flex";
   updateTopBar(name);
 }
 
@@ -820,10 +820,10 @@ async function saveProgram(prog) {
 async function deleteProgram(id) { await sbFetch(`/rest/v1/programs?id=eq.${id}`,{method:"DELETE"}); }
 
 async function enterApp() {
-  const pue = document.getElementById("programsUserEmail");
-  if (pue) pue.textContent = currentSession?.user?.email || "";
-  const tbe = document.getElementById("topBarEmail");
-  if (tbe) tbe.textContent = currentSession?.user?.email || "";
+  const _pue = document.getElementById("programsUserEmail");
+  if (_pue) _pue.textContent = currentSession?.user?.email || "";
+  const _tbe = document.getElementById("topBarEmail");
+  if (_tbe) _tbe.textContent = currentSession?.user?.email || "";
   // Parallel load for speed
   await Promise.all([loadApiKeyRemote(), loadUserProfile()]);
   await ensureProfile();
@@ -904,11 +904,10 @@ async function launchWorkout() {
     try { currentProgram.config = JSON.parse(currentProgram.config); } catch(e) {}
   }
   const cfg = currentProgram.config || {};
-  const tpn = document.getElementById("topBarProgName");
-  if (tpn) tpn.textContent = currentProgram.name;
-  const tpne = document.getElementById("topBarPageName");
-  if (tpne) tpne.textContent = currentProgram.name;
-  document.getElementById("topBarEmail").textContent = currentSession?.user?.email || "";
+  const _tpn = document.getElementById("topBarProgName");
+  if (_tpn) _tpn.textContent = currentProgram.name;
+  const _tpe = document.getElementById("topBarEmail");
+  if (_tpe) _tpe.textContent = currentSession?.user?.email || "";
   document.getElementById("workoutTitle").textContent=currentProgram.name;
   document.getElementById("workoutDesc").textContent=cfg.description||"";
   document.getElementById("workoutBadges").innerHTML=[`📅 ${(cfg.days||[]).length}j/sem`,`🎯 ${cfg.goal||""}`,cfg.level||"",`📆 ${currentProgram.weeks} sem.`].map(b=>`<span class="badge">${b}</span>`).join("");
@@ -2028,35 +2027,44 @@ async function handleNewUser() {
 }
 
 // ── Unified Navigation ───────────────────────────────────────
-let _prevScreen = null;
+const PAGE_NAMES = {
+  programs: "🏋️ Mes Programmes",
+  workout:  null, // filled dynamically
+  admin:    "🛡️ Administration",
+  profile:  "👤 Mon Profil",
+};
+const SUB_SCREENS = ["workout","admin","profile"];
 
 function updateTopBar(screenName) {
-  const pageNames = {
-    programs: "Mes Programmes",
-    workout:  null, // shows program name
-    admin:    "Administration",
-    profile:  "Mon Profil",
-  };
-  const pageEl = document.getElementById("topBarPageName");
-  const backBtn = document.getElementById("topBarBackBtn");
-  const progBtn = document.getElementById("topBarPrograms");
+  const pageEl    = document.getElementById("topBarPageName");
+  const backBtn   = document.getElementById("topBarBackBtn");
+  const progsBtn  = document.getElementById("topBarPrograms");
+  const profilBtn = document.getElementById("topBarProfil");
+  const adminBtn  = document.getElementById("adminBtnTop");
+  const logoutBtn = document.getElementById("topBarLogout");
 
-  if (screenName === "workout") {
-    if (pageEl) pageEl.textContent = document.getElementById("topBarProgName")?.textContent || "Programme";
-  } else {
-    if (pageEl) pageEl.textContent = pageNames[screenName] || "";
+  // Page name
+  if (pageEl) {
+    if (screenName === "workout") {
+      const progName = document.getElementById("workoutTitle")?.textContent || currentProgram?.name || "Programme";
+      pageEl.textContent = progName;
+    } else {
+      pageEl.textContent = PAGE_NAMES[screenName] || "";
+    }
   }
 
-  // Show back button on sub-screens, hide on programs
-  const subScreens = ["workout", "admin", "profile"];
-  if (backBtn) backBtn.style.display = subScreens.includes(screenName) ? "inline-block" : "none";
-  // Hide "Programmes" button when already on programs screen
-  if (progBtn) progBtn.style.display = screenName === "programs" ? "none" : "inline-block";
+  // Back button — only on sub-screens
+  if (backBtn) backBtn.style.display = SUB_SCREENS.includes(screenName) ? "inline-block" : "none";
 
-  // Store previous screen for back button
-  if (screenName !== _prevScreen) {
-    _prevScreen = screenName;
-  }
+  // Programmes button — hide when already on programs
+  if (progsBtn) progsBtn.style.display = screenName === "programs" ? "none" : "inline-block";
+
+  // Always show profil + logout
+  if (profilBtn) profilBtn.style.display = "inline-block";
+  if (logoutBtn) logoutBtn.style.display = "inline-block";
+
+  // Admin button — controlled by refreshAdminButtons()
+  refreshAdminButtons();
 }
 
 function topBarBack() {
