@@ -643,7 +643,7 @@
 </div>
 
 <script>
-const APP_VERSION = "v2.69";
+const APP_VERSION = "v2.70";
 const SUPABASE_URL = "https://tyllbforhngneuihfbkt.supabase.co";
 
 // ── Anthropic API Key ─────────────────────────────────────────
@@ -1755,7 +1755,9 @@ async function loadActiveUsers() {
       const res2 = await sbFetch('/rest/v1/user_profiles?select=*&order=created_at.asc');
       if (!res2.ok) { list.innerHTML = '<div style="color:#f87171;font-size:0.8rem;">Accès refusé — rôle admin requis dans Supabase.</div>'; return; }
       const users2 = await res2.json();
-      renderUserList(list, users2); return;
+      // Filter out users with must_change_password = true (never logged in)
+      const activeUsers = users2.filter(u => !u.must_change_password);
+      renderUserList(list, activeUsers); return;
     }
     const data = await res.json();
     const authUsers = data.users || [];
@@ -1764,14 +1766,17 @@ async function loadActiveUsers() {
     const profiles = profRes.ok ? await profRes.json() : [];
     const profMap = {};
     profiles.forEach(p => profMap[p.user_id] = p);
-    const merged = authUsers.map(u => ({
-      user_id: u.id, email: u.email,
-      first_name: profMap[u.id]?.first_name || '',
-      last_name: profMap[u.id]?.last_name || '',
-      age: profMap[u.id]?.age || null,
-      role: profMap[u.id]?.role || 'user',
-      created_at: u.created_at
-    }));
+    // Only show users who have completed first login (have a profile)
+    const merged = authUsers
+      .filter(u => profMap[u.id]) // exclude users without a profile
+      .map(u => ({
+        user_id: u.id, email: u.email,
+        first_name: profMap[u.id]?.first_name || '',
+        last_name: profMap[u.id]?.last_name || '',
+        age: profMap[u.id]?.age || null,
+        role: profMap[u.id]?.role || 'user',
+        created_at: u.created_at
+      }));
     renderUserList(list, merged);
   } catch(e) { list.innerHTML = '<div style="color:#f87171;">Erreur : ' + e.message + '</div>'; }
 }
@@ -1843,15 +1848,6 @@ async function adminAddUser() {
     let created = {};
     try { created = JSON.parse(createText); } catch(e) {}
     const userId = created.id || created.user?.id;
-
-    if (userId) {
-      // Create profile — user stays in pending until first login completes
-      await fetch(`${SUPABASE_URL}/rest/v1/user_profiles`, {
-        method: 'POST',
-        headers: { ...sbAdmin(), 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
-        body: JSON.stringify({ user_id: userId, email, role: 'user', must_change_password: true })
-      });
-    }
 
     // 4. Send password reset email — user clicks link → arrives on app → sets password
     let emailSent = false;
