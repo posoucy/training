@@ -138,10 +138,14 @@
   .ex-icon:hover::after { opacity: 1; }
   .img-picker-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 2000; align-items: center; justify-content: center; padding: 20px; }
   .img-picker-overlay.active { display: flex; }
-  .img-picker { background: #16161f; border: 1px solid #2a2a3a; border-radius: 18px; padding: 20px; width: 100%; max-width: 300px; animation: modalIn 0.25s ease; }
+  .img-picker { background: #16161f; border: 1px solid #2a2a3a; border-radius: 18px; padding: 18px; width: 100%; max-width: 340px; animation: modalIn 0.25s ease; }
   .img-picker-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 12px; color: #e8e8f0; }
-  .img-picker-preview { width: 100%; height: 150px; background: #1e1e2e; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; font-size: 2.5rem; }
-  .img-picker-preview img { width: 100%; height: 100%; object-fit: cover; }
+  .img-picker-preview { width: 100%; min-height: 120px; max-height: 250px; background: #1e1e2e; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; overflow-y: auto; font-size: 2.5rem; }
+  .img-picker-preview img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+  .img-pick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 6px; width: 100%; }
+  .img-pick-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s, transform 0.1s; }
+  .img-pick-thumb:hover { transform: scale(1.04); border-color: #6060a0; }
+  .img-pick-thumb.selected { border-color: #a855f7; box-shadow: 0 0 0 2px rgba(168,85,247,0.35); }
   .img-picker-input { width: 100%; background: #1e1e2e; border: 1px solid #3a3a5a; border-radius: 8px; color: #e8e8f0; font-size: 0.82rem; padding: 9px 11px; box-sizing: border-box; margin-bottom: 6px; outline: none; font-family: inherit; }
   .img-picker-input:focus { border-color: #6060a0; }
   .img-picker-btns { display: flex; gap: 7px; margin-top: 4px; }
@@ -666,8 +670,8 @@
   <div class="img-picker">
     <div class="img-picker-title">🖼️ Changer l'image</div>
     <div class="img-picker-preview" id="imgPickerPreview"></div>
-    <input class="img-picker-input" id="imgPickerInput" type="text" placeholder="ex: bench press, squat…  ou URL directe" onkeydown="if(event.key==='Enter')searchImagePicker()" />
-    <div style="font-size:0.65rem;color:#6060aa;margin-bottom:10px">Nom en anglais (bench press, squat…) ou colle une URL d'image</div>
+    <input class="img-picker-input" id="imgPickerInput" type="text" placeholder="ex: bench press chest, squat barbell…" onkeydown="if(event.key==='Enter')searchImagePicker()" />
+    <div style="font-size:0.65rem;color:#6060aa;margin-bottom:10px">Ajoute des mots-clés pour affiner · ou colle une URL directe</div>
     <div class="img-picker-btns">
       <button class="img-picker-btn img-picker-search" onclick="searchImagePicker()">🔍 Rechercher</button>
       <button class="img-picker-btn img-picker-confirm" id="imgPickerConfirm" onclick="confirmImagePicker()">✓ Confirmer</button>
@@ -1282,21 +1286,28 @@ async function loadLastWeight(dayId,exIndex){
 }
 
 const _imgCache={};
-async function _wikiImg(term){
+async function _commonsSearch(term,limit=9){
   try{
-    const res=await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(term.trim().replace(/\s+/g,'_'))}`,
-      {signal:AbortSignal.timeout(5000),headers:{Accept:'application/json'}});
-    if(!res.ok) return null;
-    const d=await res.json();
-    return d.thumbnail?.source||null;
-  }catch(e){return null;}
+    const sr=await fetch(`https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}&srnamespace=6&srlimit=${limit}&format=json&origin=*`,{signal:AbortSignal.timeout(6000)});
+    if(!sr.ok) return [];
+    const sd=await sr.json();
+    const titles=(sd.query?.search||[]).map(r=>r.title).filter(Boolean);
+    if(!titles.length) return [];
+    const ir=await fetch(`https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles.join('|'))}&prop=imageinfo&iiprop=url|thumbnail&iiurlwidth=200&format=json&origin=*`,{signal:AbortSignal.timeout(6000)});
+    if(!ir.ok) return [];
+    const id=await ir.json();
+    return Object.values(id.query?.pages||{})
+      .filter(p=>p.imageinfo?.[0]?.url)
+      .map(p=>({url:p.imageinfo[0].url,thumb:p.imageinfo[0].thumburl||p.imageinfo[0].url}));
+  }catch(e){return [];}
 }
 async function fetchExerciseImage(nameEn){
   if(!nameEn) return null;
   const ck='ex_img_'+nameEn.toLowerCase().replace(/\s+/g,'_');
   if(_imgCache[ck]!==undefined) return _imgCache[ck]||null;
   try{const cached=localStorage.getItem(ck);if(cached!==null){_imgCache[ck]=cached||null;return _imgCache[ck];}}catch(e){}
-  const url=await _wikiImg(nameEn)||await _wikiImg(nameEn+' exercise')||null;
+  const imgs=await _commonsSearch(nameEn+' exercise',3);
+  const url=imgs[0]?.url||null;
   _imgCache[ck]=url;
   try{localStorage.setItem(ck,url||'');}catch(e){}
   return url;
@@ -1469,27 +1480,30 @@ function openImagePicker(dayId,exIndex,e){
   setTimeout(()=>input.focus(),100);
 }
 
+function _selectPickerImg(el,url,nameEn){
+  document.querySelectorAll('.img-pick-thumb').forEach(t=>t.classList.remove('selected'));
+  el.classList.add('selected');
+  _ipUrl=url; _ipNameEn=nameEn;
+  document.getElementById('imgPickerConfirm').disabled=false;
+}
 async function searchImagePicker(){
   const val=document.getElementById('imgPickerInput').value.trim(); if(!val) return;
   const preview=document.getElementById('imgPickerPreview');
   const confirmBtn=document.getElementById('imgPickerConfirm');
   // Direct URL support
   if(val.startsWith('http://')||val.startsWith('https://')){
-    preview.innerHTML=`<img src="${val}" alt="custom" onerror="this.parentNode.innerHTML='<div style=\\'font-size:0.75rem;color:#f87171\\'>URL inaccessible ou invalide</div>';">`;
+    preview.innerHTML=`<img src="${val}" alt="custom" style="border-radius:12px;" onerror="this.parentNode.innerHTML='<div style=\\'font-size:0.75rem;color:#f87171;padding:10px\\'>URL inaccessible ou invalide</div>';">`;
     _ipUrl=val; _ipNameEn=null; confirmBtn.disabled=false; return;
   }
-  preview.innerHTML=`<div style="font-size:0.75rem;color:#9090aa">Recherche en cours…</div>`;
-  confirmBtn.disabled=true;
-  const ck='ex_img_'+val.toLowerCase().replace(/\s+/g,'_');
-  delete _imgCache[ck]; try{localStorage.removeItem(ck);}catch(e){}
-  const url=await fetchExerciseImage(val);
-  if(url){
-    preview.innerHTML=`<img src="${url}" alt="${val}">`;
-    _ipUrl=url; _ipNameEn=val; confirmBtn.disabled=false;
-  }else{
-    preview.innerHTML=`<div style="font-size:0.75rem;color:#f87171">Aucune image trouvée.<br>Essaie un terme plus simple (ex: squat, deadlift)<br>ou colle une URL d'image directement.</div>`;
-    _ipUrl=null; confirmBtn.disabled=true;
+  preview.innerHTML=`<div style="font-size:0.75rem;color:#9090aa;padding:10px;">Recherche en cours…</div>`;
+  confirmBtn.disabled=true; _ipUrl=null;
+  const imgs=await _commonsSearch(val+' exercise muscle');
+  if(!imgs.length){
+    preview.innerHTML=`<div style="font-size:0.75rem;color:#f87171;padding:10px;text-align:center;">Aucune image trouvée.<br><br>Essaie d'ajouter des mots-clés<br>(ex: <em>bench press chest</em>, <em>squat barbell</em>)<br>ou colle une URL directement.</div>`;
+    return;
   }
+  const thumbs=imgs.map(img=>`<img class="img-pick-thumb" src="${img.thumb}" loading="lazy" onclick="_selectPickerImg(this,'${img.url.replace(/'/g,'%27')}','${val.replace(/'/g,'%27')}')" onerror="this.style.display='none';">`).join('');
+  preview.innerHTML=`<div class="img-pick-grid">${thumbs}</div>`;
 }
 
 async function confirmImagePicker(){
