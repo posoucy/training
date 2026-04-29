@@ -666,8 +666,8 @@
   <div class="img-picker">
     <div class="img-picker-title">🖼️ Changer l'image</div>
     <div class="img-picker-preview" id="imgPickerPreview"></div>
-    <input class="img-picker-input" id="imgPickerInput" type="text" placeholder="Nom en anglais (ex: bench press)" onkeydown="if(event.key==='Enter')searchImagePicker()" />
-    <div style="font-size:0.65rem;color:#6060aa;margin-bottom:10px">Tape le nom de l'exercice en anglais, puis clique Rechercher</div>
+    <input class="img-picker-input" id="imgPickerInput" type="text" placeholder="ex: bench press, squat…  ou URL directe" onkeydown="if(event.key==='Enter')searchImagePicker()" />
+    <div style="font-size:0.65rem;color:#6060aa;margin-bottom:10px">Nom en anglais (bench press, squat…) ou colle une URL d'image</div>
     <div class="img-picker-btns">
       <button class="img-picker-btn img-picker-search" onclick="searchImagePicker()">🔍 Rechercher</button>
       <button class="img-picker-btn img-picker-confirm" id="imgPickerConfirm" onclick="confirmImagePicker()">✓ Confirmer</button>
@@ -1282,29 +1282,24 @@ async function loadLastWeight(dayId,exIndex){
 }
 
 const _imgCache={};
+async function _wikiImg(term){
+  try{
+    const res=await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(term.trim().replace(/\s+/g,'_'))}`,
+      {signal:AbortSignal.timeout(5000),headers:{Accept:'application/json'}});
+    if(!res.ok) return null;
+    const d=await res.json();
+    return d.thumbnail?.source||null;
+  }catch(e){return null;}
+}
 async function fetchExerciseImage(nameEn){
   if(!nameEn) return null;
   const ck='ex_img_'+nameEn.toLowerCase().replace(/\s+/g,'_');
   if(_imgCache[ck]!==undefined) return _imgCache[ck]||null;
   try{const cached=localStorage.getItem(ck);if(cached!==null){_imgCache[ck]=cached||null;return _imgCache[ck];}}catch(e){}
-  try{
-    const sr=await fetch(`https://wger.de/api/v2/exercise/search/?term=${encodeURIComponent(nameEn)}&language=english&format=json`,{signal:AbortSignal.timeout(5000)});
-    if(!sr.ok) throw new Error('search');
-    const sd=await sr.json();
-    const baseId=sd.suggestions?.[0]?.data?.base_id;
-    if(!baseId) throw new Error('no result');
-    const ir=await fetch(`https://wger.de/api/v2/exerciseimage/?exercise=${baseId}&format=json`,{signal:AbortSignal.timeout(5000)});
-    if(!ir.ok) throw new Error('img');
-    const id=await ir.json();
-    const url=id.results?.[0]?.image||null;
-    _imgCache[ck]=url;
-    try{localStorage.setItem(ck,url||'');}catch(e){}
-    return url;
-  }catch(e){
-    _imgCache[ck]=null;
-    try{localStorage.setItem(ck,'');}catch(e){}
-    return null;
-  }
+  const url=await _wikiImg(nameEn)||await _wikiImg(nameEn+' exercise')||null;
+  _imgCache[ck]=url;
+  try{localStorage.setItem(ck,url||'');}catch(e){}
+  return url;
 }
 
 async function saveData(dayId,exIndex,data){
@@ -1475,20 +1470,24 @@ function openImagePicker(dayId,exIndex,e){
 }
 
 async function searchImagePicker(){
-  const nameEn=document.getElementById('imgPickerInput').value.trim(); if(!nameEn) return;
+  const val=document.getElementById('imgPickerInput').value.trim(); if(!val) return;
   const preview=document.getElementById('imgPickerPreview');
   const confirmBtn=document.getElementById('imgPickerConfirm');
+  // Direct URL support
+  if(val.startsWith('http://')||val.startsWith('https://')){
+    preview.innerHTML=`<img src="${val}" alt="custom" onerror="this.parentNode.innerHTML='<div style=\\'font-size:0.75rem;color:#f87171\\'>URL inaccessible ou invalide</div>';">`;
+    _ipUrl=val; _ipNameEn=null; confirmBtn.disabled=false; return;
+  }
   preview.innerHTML=`<div style="font-size:0.75rem;color:#9090aa">Recherche en cours…</div>`;
   confirmBtn.disabled=true;
-  // Clear cache to force fresh fetch
-  const ck='ex_img_'+nameEn.toLowerCase().replace(/\s+/g,'_');
+  const ck='ex_img_'+val.toLowerCase().replace(/\s+/g,'_');
   delete _imgCache[ck]; try{localStorage.removeItem(ck);}catch(e){}
-  const url=await fetchExerciseImage(nameEn);
+  const url=await fetchExerciseImage(val);
   if(url){
-    preview.innerHTML=`<img src="${url}" alt="${nameEn}">`;
-    _ipUrl=url; _ipNameEn=nameEn; confirmBtn.disabled=false;
+    preview.innerHTML=`<img src="${url}" alt="${val}">`;
+    _ipUrl=url; _ipNameEn=val; confirmBtn.disabled=false;
   }else{
-    preview.innerHTML=`<div style="font-size:0.75rem;color:#f87171">Aucune image trouvée. Essaie un autre terme.</div>`;
+    preview.innerHTML=`<div style="font-size:0.75rem;color:#f87171">Aucune image trouvée.<br>Essaie un terme plus simple (ex: squat, deadlift)<br>ou colle une URL d'image directement.</div>`;
     _ipUrl=null; confirmBtn.disabled=true;
   }
 }
