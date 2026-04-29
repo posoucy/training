@@ -132,8 +132,11 @@
   .exercise { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; border-bottom: 1px solid #1e1e2e; cursor: pointer; border-radius: 7px; transition: background 0.15s; }
   .exercise:hover { background: #1e1e2e; padding-left: 6px; padding-right: 6px; margin: 0 -6px; }
   .exercise:last-child { border-bottom: none; }
-  .ex-icon { width: 28px; height: 28px; border-radius: 7px; background: #1e1e2e; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; margin-top: 1px; }
+  .ex-icon { width: 56px; height: 56px; border-radius: 10px; background: #1e1e2e; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; margin-top: 1px; overflow: hidden; }
+  .ex-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block; }
+  .ex-name-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
   .ex-name { font-weight: 600; font-size: 0.8rem; }
+  .ex-last-weight { font-size: 0.68rem; font-weight: 700; color: #fb923c; white-space: nowrap; flex-shrink: 0; background: rgba(251,146,60,0.12); border: 1px solid rgba(251,146,60,0.25); border-radius: 999px; padding: 1px 7px; }
   .ex-sets { font-size: 0.7rem; color: #9090aa; margin-top: 1px; }
   .ex-tip { font-size: 0.65rem; color: #6060aa; margin-top: 2px; font-style: italic; }
   .ex-click-hint { font-size: 0.62rem; color: #4a4a6a; margin-top: 3px; }
@@ -1021,7 +1024,7 @@ Réponds UNIQUEMENT avec un JSON valide sans markdown :
       "title": "NOM DU SPLIT (ex: PUSH — Poussée)",
       "muscles": "Muscle1 · Muscle2 · Muscle3",
       "exercises": [
-        { "icon": "🏋️", "name": "Nom précis de l'exercice", "sets": "3", "reps": "12", "rest": "60s",
+        { "icon": "🏋️", "name": "Nom précis de l'exercice en français", "name_en": "Exact exercise name in English (for image lookup, e.g. 'bench press')", "sets": "3", "reps": "12", "rest": "60s",
           "tip": "Conseil technique précis en français",
           "muscles_primary": ["Muscle principal"], "muscles_secondary": ["Muscle secondaire"] }
       ]
@@ -1230,6 +1233,49 @@ async function loadSaved(dayId,exIndex){
   return null;
 }
 
+async function loadLastWeight(dayId,exIndex){
+  const pid=currentProgram?.id; if(!pid) return null;
+  const suffix=`-ex-${dayId}-${exIndex}`;
+  if(currentSession?.access_token){
+    try{
+      const pattern=`${pid}-w%25${suffix}`;
+      const res=await sbFetch(`/rest/v1/workout_tracker?id=like.${pattern}&select=weight,updated_at&order=updated_at.desc&limit=1`);
+      if(res.ok){const rows=await res.json();if(rows.length>0&&rows[0].weight&&parseInt(rows[0].weight)>0)return rows[0].weight;}
+    }catch(e){}
+  }
+  const maxW=currentProgram?.weeks||52;
+  for(let w=maxW;w>=1;w--){
+    try{const v=localStorage.getItem(`${pid}-w${w}${suffix}`);if(v){const d=JSON.parse(v);if(d.weight&&parseInt(d.weight)>0)return d.weight;}}catch(e){}
+  }
+  return null;
+}
+
+const _imgCache={};
+async function fetchExerciseImage(nameEn){
+  if(!nameEn) return null;
+  const ck='ex_img_'+nameEn.toLowerCase().replace(/\s+/g,'_');
+  if(_imgCache[ck]!==undefined) return _imgCache[ck]||null;
+  try{const cached=localStorage.getItem(ck);if(cached!==null){_imgCache[ck]=cached||null;return _imgCache[ck];}}catch(e){}
+  try{
+    const sr=await fetch(`https://wger.de/api/v2/exercise/search/?term=${encodeURIComponent(nameEn)}&language=english&format=json`,{signal:AbortSignal.timeout(5000)});
+    if(!sr.ok) throw new Error('search');
+    const sd=await sr.json();
+    const baseId=sd.suggestions?.[0]?.data?.base_id;
+    if(!baseId) throw new Error('no result');
+    const ir=await fetch(`https://wger.de/api/v2/exerciseimage/?exercise=${baseId}&format=json`,{signal:AbortSignal.timeout(5000)});
+    if(!ir.ok) throw new Error('img');
+    const id=await ir.json();
+    const url=id.results?.[0]?.image||null;
+    _imgCache[ck]=url;
+    try{localStorage.setItem(ck,url||'');}catch(e){}
+    return url;
+  }catch(e){
+    _imgCache[ck]=null;
+    try{localStorage.setItem(ck,'');}catch(e){}
+    return null;
+  }
+}
+
 async function saveData(dayId,exIndex,data){
   const key=storageKey(dayId,exIndex), val=JSON.stringify(data);
   if(currentSession?.access_token){
@@ -1315,9 +1361,11 @@ async function buildGrid(){
     let exHTML="";
     for(let i=0;i<(day.exercises||[]).length;i++){
       const ex=day.exercises[i]; const saved=await loadSaved(day.id,i);
+      const iconContent=ex.icon||"🏋️";
       exHTML+=`<div class="exercise" id="ex-card-${day.id}-${i}" onclick="openModal(${day.id},${i})">
-        <div class="ex-icon">${ex.icon||"🏋️"}</div>
-        <div style="width:100%"><div class="ex-name">${ex.name}</div>
+        <div class="ex-icon" id="ex-icon-${day.id}-${i}">${iconContent}</div>
+        <div style="width:100%">
+          <div class="ex-name-row"><div class="ex-name">${ex.name}</div></div>
           <div class="ex-sets">${ex.sets} séries × ${ex.reps} · Repos ${ex.rest}</div>
           <div class="ex-tip">${ex.tip}</div>
           ${chipHTML(saved)}
@@ -1330,17 +1378,47 @@ async function buildGrid(){
     </div><div class="exercise-list">${exHTML}</div>`;
     grid.appendChild(card);
   }
+
+  // Load images and last weights asynchronously after grid is rendered
+  for(const day of days){
+    for(let i=0;i<(day.exercises||[]).length;i++){
+      const ex=day.exercises[i];
+      const nameEn=ex.name_en||ex.name;
+      fetchExerciseImage(nameEn).then(imgUrl=>{
+        if(!imgUrl) return;
+        const iconEl=document.getElementById(`ex-icon-${day.id}-${i}`);
+        if(iconEl) iconEl.innerHTML=`<img src="${imgUrl}" alt="${ex.name.replace(/"/g,'&quot;')}" onerror="this.parentNode.textContent='${(ex.icon||'🏋️').replace(/'/g,"\\'")}';this.remove();">`;
+      });
+      loadLastWeight(day.id,i).then(w=>{
+        if(!w||parseInt(w)<=0) return;
+        const card=document.getElementById(`ex-card-${day.id}-${i}`);
+        if(!card) return;
+        const nameRow=card.querySelector('.ex-name-row');
+        if(nameRow&&!nameRow.querySelector('.ex-last-weight')){
+          const badge=document.createElement('span');
+          badge.className='ex-last-weight';
+          badge.textContent=`⚖️ ${w} lbs`;
+          nameRow.appendChild(badge);
+        }
+      });
+    }
+  }
 }
 
 function refreshCard(dayId,exIndex,saved){
   const card=document.getElementById(`ex-card-${dayId}-${exIndex}`); if(!card) return;
-  const old=card.querySelector(".ex-saved-info");
-  const newEl=document.createElement("div"); newEl.outerHTML=chipHTML(saved);
-  if(old) old.replaceWith(newEl); else { const h=document.createElement("div"); h.innerHTML=chipHTML(saved); card.querySelector(".ex-click-hint")?.before(h.firstChild); }
-  // Re-render chip from scratch
-  const hint=card.querySelector(".ex-click-hint");
   const existing=card.querySelector(".ex-saved-info");
   if(existing) existing.outerHTML=chipHTML(saved);
+  else{const h=document.createElement("div");h.innerHTML=chipHTML(saved);card.querySelector(".ex-click-hint")?.before(h.firstChild);}
+  // Update last weight badge
+  if(saved?.weight&&parseInt(saved.weight)>0){
+    const nameRow=card.querySelector('.ex-name-row');
+    if(nameRow){
+      let badge=nameRow.querySelector('.ex-last-weight');
+      if(!badge){badge=document.createElement('span');badge.className='ex-last-weight';nameRow.appendChild(badge);}
+      badge.textContent=`⚖️ ${saved.weight} lbs`;
+    }
+  }
 }
 
 // ── Modal ─────────────────────────────────────────────────────
