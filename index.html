@@ -1291,7 +1291,7 @@ let _exDB=null;
 async function _loadExDB(){
   if(_exDB) return _exDB;
   try{
-    const res=await fetch('https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises.json',{signal:AbortSignal.timeout(12000)});
+    const res=await fetch('https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json',{signal:AbortSignal.timeout(15000)});
     if(!res.ok) return null;
     _exDB=await res.json();
     return _exDB;
