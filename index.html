@@ -136,6 +136,7 @@
   .ex-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block; }
   .ex-icon::after { content: '✏️'; position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; opacity: 0; transition: opacity 0.15s; border-radius: 10px; pointer-events: none; }
   .ex-icon:hover::after { opacity: 1; }
+  @media (hover: none) { .ex-icon::after { opacity: 1; background: rgba(0,0,0,0.35); font-size: 0.7rem; } }
   .img-picker-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 2000; align-items: center; justify-content: center; padding: 20px; }
   .img-picker-overlay.active { display: flex; }
   .img-picker { background: #16161f; border: 1px solid #2a2a3a; border-radius: 18px; padding: 18px; width: 100%; max-width: 340px; animation: modalIn 0.25s ease; }
@@ -1431,7 +1432,8 @@ async function buildGrid(){
     for(let i=0;i<(day.exercises||[]).length;i++){
       const ex=day.exercises[i];
       const nameEn=ex.name_en||ex.name;
-      fetchExerciseImage(nameEn).then(imgUrl=>{
+      // Use image_url from program config first (synced via Supabase), then fallback to search
+      (ex.image_url?Promise.resolve(ex.image_url):fetchExerciseImage(nameEn)).then(imgUrl=>{
         if(!imgUrl) return;
         const iconEl=document.getElementById(`ex-icon-${day.id}-${i}`);
         if(iconEl) iconEl.innerHTML=`<img src="${imgUrl}" alt="${ex.name.replace(/"/g,'&quot;')}" onerror="this.parentNode.textContent='${(ex.icon||'🏋️').replace(/'/g,"\\'")}';this.remove();">`;
@@ -1481,10 +1483,9 @@ function openImagePicker(dayId,exIndex,e){
   input.value=ex?.name_en||ex?.name||'';
   const preview=document.getElementById('imgPickerPreview');
   const confirmBtn=document.getElementById('imgPickerConfirm');
-  // Show cached image if available
-  const ck='ex_img_'+(ex?.name_en||ex?.name||'').toLowerCase().replace(/\s+/g,'_');
-  const cached=_imgCache[ck]!==undefined?(_imgCache[ck]||null):localStorage.getItem(ck)||null;
-  if(cached){preview.innerHTML=`<img src="${cached}" alt="">`;_ipUrl=cached;confirmBtn.disabled=false;}
+  // Show current image: prefer image_url from program config (synced across devices)
+  const currentImg=ex?.image_url||(()=>{const ck='ex_img_'+(ex?.name_en||ex?.name||'').toLowerCase().replace(/\s+/g,'_');return _imgCache[ck]!==undefined?(_imgCache[ck]||null):localStorage.getItem(ck)||null;})();
+  if(currentImg){preview.innerHTML=`<img src="${currentImg}" alt="">`;_ipUrl=currentImg;confirmBtn.disabled=false;}
   else{preview.innerHTML=ex?.icon||'🏋️';confirmBtn.disabled=true;}
   document.getElementById('imgPickerOverlay').classList.add('active');
   setTimeout(()=>input.focus(),100);
@@ -1529,6 +1530,7 @@ async function confirmImagePicker(){
   const day=days.find(d=>d.id===_ipDay);
   if(day?.exercises?.[_ipEx]){
     day.exercises[_ipEx].name_en=nameEn;
+    day.exercises[_ipEx].image_url=_ipUrl; // persist across devices via Supabase
     if(currentSession?.access_token){
       sbFetch(`/rest/v1/programs?id=eq.${currentProgram.id}`,{
         method:'PATCH',headers:{'Prefer':'return=minimal'},
