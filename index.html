@@ -670,8 +670,8 @@
   <div class="img-picker">
     <div class="img-picker-title">🖼️ Changer l'image</div>
     <div class="img-picker-preview" id="imgPickerPreview"></div>
-    <input class="img-picker-input" id="imgPickerInput" type="text" placeholder="ex: bench press chest, squat barbell…" onkeydown="if(event.key==='Enter')searchImagePicker()" />
-    <div style="font-size:0.65rem;color:#6060aa;margin-bottom:10px">Ajoute des mots-clés pour affiner · ou colle une URL directe</div>
+    <input class="img-picker-input" id="imgPickerInput" type="text" placeholder="ex: bench press, squat, lat pulldown…" onkeydown="if(event.key==='Enter')searchImagePicker()" />
+    <div style="font-size:0.65rem;color:#6060aa;margin-bottom:10px">Nom en anglais · 800+ exercices de gym · ou URL directe</div>
     <div class="img-picker-btns">
       <button class="img-picker-btn img-picker-search" onclick="searchImagePicker()">🔍 Rechercher</button>
       <button class="img-picker-btn img-picker-confirm" id="imgPickerConfirm" onclick="confirmImagePicker()">✓ Confirmer</button>
@@ -1286,28 +1286,38 @@ async function loadLastWeight(dayId,exIndex){
 }
 
 const _imgCache={};
-async function _commonsSearch(term,limit=9){
+const _EX_IMG_BASE='https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
+let _exDB=null;
+async function _loadExDB(){
+  if(_exDB) return _exDB;
   try{
-    const sr=await fetch(`https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(term)}&srnamespace=6&srlimit=${limit}&format=json&origin=*`,{signal:AbortSignal.timeout(6000)});
-    if(!sr.ok) return [];
-    const sd=await sr.json();
-    const titles=(sd.query?.search||[]).map(r=>r.title).filter(Boolean);
-    if(!titles.length) return [];
-    const ir=await fetch(`https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(titles.join('|'))}&prop=imageinfo&iiprop=url|thumbnail&iiurlwidth=200&format=json&origin=*`,{signal:AbortSignal.timeout(6000)});
-    if(!ir.ok) return [];
-    const id=await ir.json();
-    return Object.values(id.query?.pages||{})
-      .filter(p=>p.imageinfo?.[0]?.url)
-      .map(p=>({url:p.imageinfo[0].url,thumb:p.imageinfo[0].thumburl||p.imageinfo[0].url}));
-  }catch(e){return [];}
+    const res=await fetch('https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises.json',{signal:AbortSignal.timeout(12000)});
+    if(!res.ok) return null;
+    _exDB=await res.json();
+    return _exDB;
+  }catch(e){return null;}
+}
+function _scoreEx(ex,q){
+  const n=ex.name.toLowerCase(),qn=q.toLowerCase();
+  if(n===qn) return 100;
+  if(n.startsWith(qn)) return 80;
+  if(n.includes(qn)) return 60;
+  const nw=n.split(/[\s\-\/]+/),qw=qn.split(/[\s\-\/]+/);
+  const hits=qw.filter(w=>w.length>2&&nw.some(nwi=>nwi.includes(w)||w.includes(nwi))).length;
+  return hits>0?(hits/qw.length)*40:0;
+}
+function _searchExDB(query,limit=8){
+  if(!_exDB) return [];
+  return _exDB.map(ex=>({ex,s:_scoreEx(ex,query)})).filter(({s})=>s>0).sort((a,b)=>b.s-a.s).slice(0,limit).map(({ex})=>ex);
 }
 async function fetchExerciseImage(nameEn){
   if(!nameEn) return null;
   const ck='ex_img_'+nameEn.toLowerCase().replace(/\s+/g,'_');
   if(_imgCache[ck]!==undefined) return _imgCache[ck]||null;
-  try{const cached=localStorage.getItem(ck);if(cached!==null){_imgCache[ck]=cached||null;return _imgCache[ck];}}catch(e){}
-  const imgs=await _commonsSearch(nameEn+' exercise',3);
-  const url=imgs[0]?.url||null;
+  try{const c=localStorage.getItem(ck);if(c!==null){_imgCache[ck]=c||null;return _imgCache[ck];}}catch(e){}
+  const db=await _loadExDB(); if(!db){_imgCache[ck]=null;return null;}
+  const m=_searchExDB(nameEn,1);
+  const url=m[0]?.images?.[0]?_EX_IMG_BASE+m[0].images[0]:null;
   _imgCache[ck]=url;
   try{localStorage.setItem(ck,url||'');}catch(e){}
   return url;
@@ -1490,25 +1500,31 @@ async function searchImagePicker(){
   const val=document.getElementById('imgPickerInput').value.trim(); if(!val) return;
   const preview=document.getElementById('imgPickerPreview');
   const confirmBtn=document.getElementById('imgPickerConfirm');
-  // Direct URL support
   if(val.startsWith('http://')||val.startsWith('https://')){
     preview.innerHTML=`<img src="${val}" alt="custom" style="border-radius:12px;" onerror="this.parentNode.innerHTML='<div style=\\'font-size:0.75rem;color:#f87171;padding:10px\\'>URL inaccessible ou invalide</div>';">`;
     _ipUrl=val; _ipNameEn=null; confirmBtn.disabled=false; return;
   }
-  preview.innerHTML=`<div style="font-size:0.75rem;color:#9090aa;padding:10px;">Recherche en cours…</div>`;
+  preview.innerHTML=`<div style="font-size:0.75rem;color:#9090aa;padding:10px;text-align:center;">Chargement de la base d'exercices…</div>`;
   confirmBtn.disabled=true; _ipUrl=null;
-  const imgs=await _commonsSearch(val+' exercise muscle');
-  if(!imgs.length){
-    preview.innerHTML=`<div style="font-size:0.75rem;color:#f87171;padding:10px;text-align:center;">Aucune image trouvée.<br><br>Essaie d'ajouter des mots-clés<br>(ex: <em>bench press chest</em>, <em>squat barbell</em>)<br>ou colle une URL directement.</div>`;
+  const db=await _loadExDB();
+  if(!db){preview.innerHTML=`<div style="font-size:0.75rem;color:#f87171;padding:10px;text-align:center;">Impossible de charger la base d'exercices.<br>Vérifie ta connexion.</div>`;return;}
+  const matches=_searchExDB(val,8);
+  if(!matches.length){
+    preview.innerHTML=`<div style="font-size:0.75rem;color:#f87171;padding:10px;text-align:center;">Aucun exercice trouvé pour "<em>${val}</em>".<br><br>Essaie en anglais : <em>bench press</em>, <em>squat</em>, <em>lat pulldown</em>…<br>ou colle une URL d'image directement.</div>`;
     return;
   }
-  const thumbs=imgs.map(img=>`<img class="img-pick-thumb" src="${img.thumb}" loading="lazy" onclick="_selectPickerImg(this,'${img.url.replace(/'/g,'%27')}','${val.replace(/'/g,'%27')}')" onerror="this.style.display='none';">`).join('');
+  const imgs=matches.flatMap(ex=>(ex.images||[]).map(p=>({url:_EX_IMG_BASE+p,name:ex.name}))).slice(0,12);
+  const thumbs=imgs.map(img=>`<img class="img-pick-thumb" src="${img.url}" loading="lazy" title="${img.name.replace(/"/g,'&quot;')}" onclick="_selectPickerImg(this,'${img.url.replace(/'/g,'%27')}','${val.replace(/'/g,'%27')}')" onerror="this.style.display='none';">`).join('');
   preview.innerHTML=`<div class="img-pick-grid">${thumbs}</div>`;
 }
 
 async function confirmImagePicker(){
   if(!_ipUrl||_ipDay===null) return;
   const nameEn=_ipNameEn||document.getElementById('imgPickerInput').value.trim();
+  // Persist selected image URL in cache so it's reused on next load
+  const ck='ex_img_'+nameEn.toLowerCase().replace(/\s+/g,'_');
+  _imgCache[ck]=_ipUrl;
+  try{localStorage.setItem(ck,_ipUrl);}catch(e){}
   const days=currentProgram?.config?.days||[];
   const day=days.find(d=>d.id===_ipDay);
   if(day?.exercises?.[_ipEx]){
