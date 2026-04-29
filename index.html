@@ -132,8 +132,24 @@
   .exercise { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; border-bottom: 1px solid #1e1e2e; cursor: pointer; border-radius: 7px; transition: background 0.15s; }
   .exercise:hover { background: #1e1e2e; padding-left: 6px; padding-right: 6px; margin: 0 -6px; }
   .exercise:last-child { border-bottom: none; }
-  .ex-icon { width: 56px; height: 56px; border-radius: 10px; background: #1e1e2e; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; margin-top: 1px; overflow: hidden; }
+  .ex-icon { width: 56px; height: 56px; border-radius: 10px; background: #1e1e2e; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; margin-top: 1px; overflow: hidden; position: relative; cursor: pointer; }
   .ex-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block; }
+  .ex-icon::after { content: '✏️'; position: absolute; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; opacity: 0; transition: opacity 0.15s; border-radius: 10px; pointer-events: none; }
+  .ex-icon:hover::after { opacity: 1; }
+  .img-picker-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); z-index: 2000; align-items: center; justify-content: center; padding: 20px; }
+  .img-picker-overlay.active { display: flex; }
+  .img-picker { background: #16161f; border: 1px solid #2a2a3a; border-radius: 18px; padding: 20px; width: 100%; max-width: 300px; animation: modalIn 0.25s ease; }
+  .img-picker-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 12px; color: #e8e8f0; }
+  .img-picker-preview { width: 100%; height: 150px; background: #1e1e2e; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; font-size: 2.5rem; }
+  .img-picker-preview img { width: 100%; height: 100%; object-fit: cover; }
+  .img-picker-input { width: 100%; background: #1e1e2e; border: 1px solid #3a3a5a; border-radius: 8px; color: #e8e8f0; font-size: 0.82rem; padding: 9px 11px; box-sizing: border-box; margin-bottom: 6px; outline: none; font-family: inherit; }
+  .img-picker-input:focus { border-color: #6060a0; }
+  .img-picker-btns { display: flex; gap: 7px; margin-top: 4px; }
+  .img-picker-btn { flex: 1; padding: 9px 6px; border-radius: 8px; border: 1px solid #3a3a5a; background: #1e1e2e; color: #e8e8f0; font-size: 0.75rem; cursor: pointer; font-family: inherit; font-weight: 600; }
+  .img-picker-search { background: rgba(96,165,250,0.1); border-color: rgba(96,165,250,0.3); color: #93c5fd; }
+  .img-picker-confirm { background: rgba(168,85,247,0.15); border-color: rgba(168,85,247,0.35); color: #c084fc; }
+  .img-picker-confirm:disabled { opacity: 0.35; cursor: not-allowed; }
+  .img-picker-cancel { flex: 0 0 auto; padding: 9px 12px; background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); color: #f87171; }
   .ex-name-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
   .ex-name { font-weight: 600; font-size: 0.8rem; }
   .ex-last-weight { font-size: 0.68rem; font-weight: 700; color: #fb923c; white-space: nowrap; flex-shrink: 0; background: rgba(251,146,60,0.12); border: 1px solid rgba(251,146,60,0.25); border-radius: 999px; padding: 1px 7px; }
@@ -641,6 +657,21 @@
     <div class="edit-prog-btns">
       <button class="btn-secondary" onclick="closeEditProg()">Annuler</button>
       <button class="btn-primary" onclick="saveEditProg()">💾 Sauvegarder</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image Picker Overlay -->
+<div class="img-picker-overlay" id="imgPickerOverlay">
+  <div class="img-picker">
+    <div class="img-picker-title">🖼️ Changer l'image</div>
+    <div class="img-picker-preview" id="imgPickerPreview"></div>
+    <input class="img-picker-input" id="imgPickerInput" type="text" placeholder="Nom en anglais (ex: bench press)" onkeydown="if(event.key==='Enter')searchImagePicker()" />
+    <div style="font-size:0.65rem;color:#6060aa;margin-bottom:10px">Tape le nom de l'exercice en anglais, puis clique Rechercher</div>
+    <div class="img-picker-btns">
+      <button class="img-picker-btn img-picker-search" onclick="searchImagePicker()">🔍 Rechercher</button>
+      <button class="img-picker-btn img-picker-confirm" id="imgPickerConfirm" onclick="confirmImagePicker()">✓ Confirmer</button>
+      <button class="img-picker-btn img-picker-cancel" onclick="closeImagePicker()">✕</button>
     </div>
   </div>
 </div>
@@ -1363,7 +1394,7 @@ async function buildGrid(){
       const ex=day.exercises[i]; const saved=await loadSaved(day.id,i);
       const iconContent=ex.icon||"🏋️";
       exHTML+=`<div class="exercise" id="ex-card-${day.id}-${i}" onclick="openModal(${day.id},${i})">
-        <div class="ex-icon" id="ex-icon-${day.id}-${i}">${iconContent}</div>
+        <div class="ex-icon" id="ex-icon-${day.id}-${i}" onclick="openImagePicker(${day.id},${i},event)" title="Changer l'image">${iconContent}</div>
         <div style="width:100%">
           <div class="ex-name-row"><div class="ex-name">${ex.name}</div></div>
           <div class="ex-sets">${ex.sets} séries × ${ex.reps} · Repos ${ex.rest}</div>
@@ -1420,6 +1451,74 @@ function refreshCard(dayId,exIndex,saved){
     }
   }
 }
+
+// ── Image Picker ──────────────────────────────────────────────
+let _ipDay=null,_ipEx=null,_ipUrl=null,_ipNameEn=null;
+
+function openImagePicker(dayId,exIndex,e){
+  e.stopPropagation();
+  _ipDay=dayId; _ipEx=exIndex; _ipUrl=null; _ipNameEn=null;
+  const days=currentProgram?.config?.days||[];
+  const day=days.find(d=>d.id===dayId);
+  const ex=day?.exercises?.[exIndex];
+  const input=document.getElementById('imgPickerInput');
+  input.value=ex?.name_en||ex?.name||'';
+  const preview=document.getElementById('imgPickerPreview');
+  const confirmBtn=document.getElementById('imgPickerConfirm');
+  // Show cached image if available
+  const ck='ex_img_'+(ex?.name_en||ex?.name||'').toLowerCase().replace(/\s+/g,'_');
+  const cached=_imgCache[ck]!==undefined?(_imgCache[ck]||null):localStorage.getItem(ck)||null;
+  if(cached){preview.innerHTML=`<img src="${cached}" alt="">`;_ipUrl=cached;confirmBtn.disabled=false;}
+  else{preview.innerHTML=ex?.icon||'🏋️';confirmBtn.disabled=true;}
+  document.getElementById('imgPickerOverlay').classList.add('active');
+  setTimeout(()=>input.focus(),100);
+}
+
+async function searchImagePicker(){
+  const nameEn=document.getElementById('imgPickerInput').value.trim(); if(!nameEn) return;
+  const preview=document.getElementById('imgPickerPreview');
+  const confirmBtn=document.getElementById('imgPickerConfirm');
+  preview.innerHTML=`<div style="font-size:0.75rem;color:#9090aa">Recherche en cours…</div>`;
+  confirmBtn.disabled=true;
+  // Clear cache to force fresh fetch
+  const ck='ex_img_'+nameEn.toLowerCase().replace(/\s+/g,'_');
+  delete _imgCache[ck]; try{localStorage.removeItem(ck);}catch(e){}
+  const url=await fetchExerciseImage(nameEn);
+  if(url){
+    preview.innerHTML=`<img src="${url}" alt="${nameEn}">`;
+    _ipUrl=url; _ipNameEn=nameEn; confirmBtn.disabled=false;
+  }else{
+    preview.innerHTML=`<div style="font-size:0.75rem;color:#f87171">Aucune image trouvée. Essaie un autre terme.</div>`;
+    _ipUrl=null; confirmBtn.disabled=true;
+  }
+}
+
+async function confirmImagePicker(){
+  if(!_ipUrl||_ipDay===null) return;
+  const nameEn=_ipNameEn||document.getElementById('imgPickerInput').value.trim();
+  const days=currentProgram?.config?.days||[];
+  const day=days.find(d=>d.id===_ipDay);
+  if(day?.exercises?.[_ipEx]){
+    day.exercises[_ipEx].name_en=nameEn;
+    if(currentSession?.access_token){
+      sbFetch(`/rest/v1/programs?id=eq.${currentProgram.id}`,{
+        method:'PATCH',headers:{'Prefer':'return=minimal'},
+        body:JSON.stringify({config:currentProgram.config})
+      }).catch(()=>{});
+    }
+  }
+  // Update card image
+  const iconEl=document.getElementById(`ex-icon-${_ipDay}-${_ipEx}`);
+  const ex=day?.exercises?.[_ipEx];
+  if(iconEl) iconEl.innerHTML=`<img src="${_ipUrl}" alt="${(ex?.name||'').replace(/"/g,'&quot;')}" onerror="this.parentNode.textContent='${(ex?.icon||'🏋️').replace(/'/g,"\\'")}';this.remove();">`;
+  closeImagePicker();
+}
+
+function closeImagePicker(){
+  document.getElementById('imgPickerOverlay').classList.remove('active');
+  _ipDay=null;_ipEx=null;_ipUrl=null;_ipNameEn=null;
+}
+document.getElementById('imgPickerOverlay').addEventListener('click',function(e){if(e.target===this)closeImagePicker();});
 
 // ── Modal ─────────────────────────────────────────────────────
 const overlay=document.getElementById("modalOverlay");
